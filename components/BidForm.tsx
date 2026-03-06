@@ -5,11 +5,12 @@ import { Icons, COLORS } from '../constants';
 interface BidFormProps {
   onSave: (bid: Bid) => void;
   onCancel: () => void;
+  onConfirmRequest: (message: string, onConfirm: () => void) => void;
   initialData?: Bid | null;
   theme: 'light' | 'dark';
 }
 
-const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, initialData, theme }) => {
+const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, initialData, theme }) => {
   const isDark = theme === 'dark';
   
   const emptyForm: Partial<Bid> = {
@@ -72,12 +73,12 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, initialData, theme 
   }, [initialData]);
 
   const handleResetForm = () => {
-    if (window.confirm('Clear all data from this specific worksheet?')) {
+    onConfirmRequest('Clear all data from this specific worksheet?', () => {
       setFormData(emptyForm);
       setServiceInputStrings({
         '1': { qty: '1', rate: '' }
       });
-    }
+    });
   };
 
   const addServiceLine = () => {

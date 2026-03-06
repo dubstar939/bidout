@@ -3,6 +3,7 @@ import { Bid, CalculatedBid, FacilityInfo } from './types';
 import { Icons, COLORS } from './constants';
 import BidForm from './components/BidForm';
 import SavingsMatrix from './components/SavingsMatrix';
+import SavingsSummary from './components/SavingsSummary';
 import { getAIAnalysis } from './services/analysisService';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from 'recharts';
 import html2canvas from 'html2canvas';
@@ -351,17 +352,54 @@ const App: React.FC = () => {
             <BidForm 
               onSave={handleSaveBid} 
               onCancel={() => { setIsFormOpen(false); setEditingBid(null); }}
+              onConfirmRequest={(message, onConfirm) => setConfirmDialog({ isOpen: true, message, onConfirm })}
               initialData={editingBid}
               theme={theme}
             />
           </div>
+        ) : !currentService && prospectiveBids.length === 0 ? (
+          <div className="space-y-12">
+            <div className={`p-12 rounded-lg border-2 border-dashed text-center space-y-8 transition-colors ${isDark ? 'bg-slate-900/40 border-teal-500/20' : 'bg-white border-slate-200'}`}>
+              <div className="max-w-2xl mx-auto space-y-6">
+                <h2 className={`text-2xl font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-slate-900'}`}>
+                  Waste Savings Calculator
+                </h2>
+                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
+                  Compare your current waste hauling costs against market bids to identify hidden surcharges and projected savings. 
+                  Follow these steps to initiate your audit:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8">
+                  <div className="space-y-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto font-black ${isDark ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-700'}`}>1</div>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Input Baseline</p>
+                    <p className="text-[10px] text-slate-500 uppercase">Record your current hauler's rates and surcharges.</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto font-black ${isDark ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-700'}`}>2</div>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Add Market Bids</p>
+                    <p className="text-[10px] text-slate-500 uppercase">Enter prospective quotes from competing haulers.</p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center mx-auto font-black ${isDark ? 'bg-teal-500/20 text-teal-400' : 'bg-teal-50 text-teal-700'}`}>3</div>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Analyze Yield</p>
+                    <p className="text-[10px] text-slate-500 uppercase">View projected savings and executive AI-driven reports.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setEditingBid(null); setIsFormOpen(true); }}
+                  className={`mt-12 py-4 px-12 rounded font-black uppercase tracking-[0.4em] text-[11px] transition-all shadow-xl active:scale-95 ${isDark ? 'bg-[#2dd4bf] text-slate-950 hover:bg-[#0d9488] hover:text-white' : 'bg-[#0d9488] text-white hover:bg-teal-700'}`}
+                >
+                  Start Baseline Audit
+                </button>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="space-y-12">
-            
             <section className="space-y-4">
               <h2 className={`text-xs font-black uppercase tracking-[0.3em] flex items-center gap-4 ${isDark ? 'text-teal-500' : 'text-teal-700'}`}>
                 <span className={`h-4 w-1 shadow-[0_0_8px_rgba(45,212,191,0.5)] ${isDark ? 'bg-[#2dd4bf]' : 'bg-teal-700'}`}></span>
-                Normalization Baseline: Current Service
+                Normalization Baseline: Current Service (Calculator Input)
               </h2>
               {currentService ? (
                  <div className={`rounded border shadow-xl overflow-hidden border-l-4 backdrop-blur-sm transition-colors ${isDark ? 'bg-[#1e293b]/60 border-teal-500/20 border-l-slate-400' : 'bg-white border-slate-200 border-l-slate-600'}`}>
@@ -387,9 +425,17 @@ const App: React.FC = () => {
               ) : (
                 <div className={`border-2 border-dashed p-10 text-center rounded no-print ${isDark ? 'bg-slate-800/20 border-slate-700' : 'bg-white border-slate-200'}`}>
                   <p className="text-slate-500 text-xs italic uppercase tracking-[0.2em] text-[10px]">Benchmark "Current Service" required to initiate variance analysis.</p>
+                  <button 
+                    onClick={() => { setEditingBid({ isCurrent: true } as any); setIsFormOpen(true); }}
+                    className={`mt-4 text-[10px] font-black uppercase tracking-widest underline underline-offset-4 ${isDark ? 'text-teal-400 hover:text-white' : 'text-teal-700 hover:text-teal-900'}`}
+                  >
+                    Add Current Service Baseline
+                  </button>
                 </div>
               )}
             </section>
+
+            <SavingsSummary bids={calculatedBids} theme={theme} />
 
             {calculatedBids.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

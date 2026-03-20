@@ -94,7 +94,8 @@ const App: React.FC = () => {
       const contingentFees = 
         (bid.removalFee || 0) + 
         (bid.xpuFee || 0) + 
-        (bid.overageFee || 0);
+        (bid.overageFee || 0) +
+        (bid.contaminationFee || 0);
 
       const totalMonthlyOpEx = servicesMonthly + recurringFeesMonthly;
       const totalAnnualOpEx = totalMonthlyOpEx * 12;

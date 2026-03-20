@@ -25,6 +25,7 @@ export interface Bid {
   removalFee: number;
   xpuFee: number;
   overageFee: number;
+  contaminationFee: number;
   compactorType: string;
   equipmentFee: number;
   contractTermMonths: number;

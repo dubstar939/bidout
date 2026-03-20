@@ -27,6 +27,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
     removalFee: 0,
     xpuFee: 0,
     overageFee: 0,
+    contaminationFee: 0,
     compactorType: '',
     equipmentFee: 0,
     contractTermMonths: 36,
@@ -191,17 +192,69 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
               <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-[#2dd4bf]' : 'text-slate-500 group-hover:text-teal-700'}`}>SET AS BASELINE</span>
            </label>
            
-           {!formData.isCurrent && (
-             <label className="flex items-center gap-3 cursor-pointer group">
-                <input 
-                  type="checkbox" 
-                  className={`w-5 h-5 rounded border ${isDark ? 'accent-cyan-400 bg-slate-900 border-cyan-500/30' : 'accent-cyan-600 border-slate-300'}`} 
-                  checked={formData.status?.selected || false} 
-                  onChange={() => toggleStatus('selected')} 
-                />
-                <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-cyan-400' : 'text-slate-500 group-hover:text-cyan-600'}`}>FLAG FOR AWARD</span>
-             </label>
-           )}
+            {!formData.isCurrent && (
+              <>
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className={`w-5 h-5 rounded border ${isDark ? 'accent-cyan-400 bg-slate-900 border-cyan-500/30' : 'accent-cyan-600 border-slate-300'}`} 
+                    checked={formData.status?.selected || false} 
+                    onChange={() => toggleStatus('selected')} 
+                  />
+                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-cyan-400' : 'text-slate-500 group-hover:text-cyan-600'}`}>FLAG FOR AWARD</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className={`w-5 h-5 rounded border ${isDark ? 'accent-indigo-400 bg-slate-900 border-indigo-500/30' : 'accent-indigo-600 border-slate-300'}`} 
+                    checked={formData.status?.addendumSent || false} 
+                    onChange={() => toggleStatus('addendumSent')} 
+                  />
+                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-indigo-400' : 'text-slate-500 group-hover:text-indigo-600'}`}>ADDENDUM SENT</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className={`w-5 h-5 rounded border ${isDark ? 'accent-purple-400 bg-slate-900 border-purple-500/30' : 'accent-purple-600 border-slate-300'}`} 
+                    checked={formData.status?.agreementRequested || false} 
+                    onChange={() => toggleStatus('agreementRequested')} 
+                  />
+                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-purple-400' : 'text-slate-500 group-hover:text-purple-600'}`}>AGREEMENT REQ</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className={`w-5 h-5 rounded border ${isDark ? 'accent-pink-400 bg-slate-900 border-pink-500/30' : 'accent-pink-600 border-slate-300'}`} 
+                    checked={formData.status?.sentToCustomer || false} 
+                    onChange={() => toggleStatus('sentToCustomer')} 
+                  />
+                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-pink-400' : 'text-slate-500 group-hover:text-pink-600'}`}>SENT TO CUST</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className={`w-5 h-5 rounded border ${isDark ? 'accent-orange-400 bg-slate-900 border-orange-500/30' : 'accent-orange-600 border-slate-300'}`} 
+                    checked={formData.status?.sentToHauler || false} 
+                    onChange={() => toggleStatus('sentToHauler')} 
+                  />
+                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-orange-400' : 'text-slate-500 group-hover:text-orange-600'}`}>SENT TO HAULER</span>
+                </label>
+
+                <label className="flex items-center gap-3 cursor-pointer group">
+                  <input 
+                    type="checkbox" 
+                    className={`w-5 h-5 rounded border ${isDark ? 'accent-emerald-400 bg-slate-900 border-emerald-500/30' : 'accent-emerald-600 border-slate-300'}`} 
+                    checked={formData.status?.loadedToDatabase || false} 
+                    onChange={() => toggleStatus('loadedToDatabase')} 
+                  />
+                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-emerald-400' : 'text-slate-500 group-hover:text-emerald-600'}`}>LOADED TO DB</span>
+                </label>
+              </>
+            )}
         </div>
       </div>
       
@@ -397,6 +450,13 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">$</span>
                     <input type="number" step="0.01" name="overageFee" value={formData.overageFee === 0 ? '' : formData.overageFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Contamination</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">$</span>
+                    <input type="number" step="0.01" name="contaminationFee" value={formData.contaminationFee === 0 ? '' : formData.contaminationFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
                   </div>
                 </div>
               </div>

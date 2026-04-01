@@ -14,10 +14,9 @@ export const calculateBidMetrics = (bids: Bid[]): CalculatedBid[] => {
       (bid.miscFees || 0) + 
       (bid.equipmentFee || 0);
 
-    const oneTimeFees = (bid.deliveryFee || 0);
+    const oneTimeFees = (bid.deliveryFee || 0) + (bid.removalFee || 0);
 
     const contingentFees = 
-      (bid.removalFee || 0) + 
       (bid.xpuFee || 0) + 
       (bid.overageFee || 0) +
       (bid.contaminationFee || 0);
@@ -53,6 +52,16 @@ export const calculateBidMetrics = (bids: Bid[]): CalculatedBid[] => {
   }
   
   return results;
+};
+
+export const validateBid = (bid: Partial<Bid>): string[] => {
+  const errors: string[] = [];
+  if (!bid.haulerName?.trim()) errors.push("Hauler Name is required.");
+  if (!bid.services || bid.services.length === 0) errors.push("At least one service line is required.");
+  if (bid.services?.some(s => !s.wasteType.trim())) errors.push("All service lines must have a waste type.");
+  if (bid.services?.some(s => s.rate < 0)) errors.push("Service rates cannot be negative.");
+  if ((bid.contractTermMonths || 0) < 1) errors.push("Contract term must be at least 1 month.");
+  return errors;
 };
 
 export const currencyFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });

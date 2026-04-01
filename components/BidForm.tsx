@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bid, ServiceLineItem } from '../types';
 import { Icons } from '../constants';
 import { useTheme } from './ThemeContext';
+import { validateBid } from '../services/calculationUtils';
 
 interface BidFormProps {
   onSave: (bid: Bid) => void;
@@ -58,6 +59,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
   };
 
   const [formData, setFormData] = useState<Partial<Bid>>(emptyForm);
+  const [errors, setErrors] = useState<string[]>([]);
 
   const [serviceInputStrings, setServiceInputStrings] = useState<{
     [serviceId: string]: {
@@ -176,6 +178,13 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const validationErrors = validateBid(formData);
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+    setErrors([]);
     onSave({
       ...formData,
       id: initialData?.id || Date.now().toString(),
@@ -257,6 +266,15 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
       </div>
       
       <form onSubmit={handleSubmit} className={`p-10 space-y-12 bg-gradient-to-b ${isDark ? 'from-transparent to-slate-950/20' : 'from-transparent to-slate-50/30'}`}>
+        {errors.length > 0 && (
+          <div className={`p-4 rounded border ${isDark ? 'bg-red-900/20 border-red-500/50 text-red-400' : 'bg-red-50 border-red-200 text-red-700'}`}>
+            <h4 className="text-xs font-black uppercase tracking-widest mb-2">Validation Errors Found</h4>
+            <ul className="list-disc list-inside text-[10px] font-bold space-y-1">
+              {errors.map((err, i) => <li key={i}>{err}</li>)}
+            </ul>
+          </div>
+        )}
+
         {/* SECTION 1: ENTITY DETAILS */}
         <div className="space-y-6">
           <h3 className={`text-[11px] font-black uppercase tracking-[0.3em] flex items-center gap-4 ${isDark ? 'text-teal-500/60' : 'text-teal-700/60'}`}>
@@ -357,14 +375,14 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">CPI Increase</label>
                   <div className="relative">
-                    <input type="number" step="0.01" name="cpi" value={formData.cpi === 0 ? '' : formData.cpi} onChange={handleChange} className={`w-full p-3 pr-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20 text-white focus:border-teal-400' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
+                    <input type="number" step="0.01" min="0" name="cpi" value={formData.cpi === 0 ? '' : formData.cpi} onChange={handleChange} className={`w-full p-3 pr-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-teal-600">%</span>
                   </div>
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Fuel/Energy Load</label>
                   <div className="relative">
-                    <input type="number" step="0.01" name="fuel" value={formData.fuel === 0 ? '' : formData.fuel} onChange={handleChange} className={`w-full p-3 pr-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20 text-white focus:border-teal-400' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
+                    <input type="number" step="0.01" min="0" name="fuel" value={formData.fuel === 0 ? '' : formData.fuel} onChange={handleChange} className={`w-full p-3 pr-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-teal-600">%</span>
                   </div>
                 </div>
@@ -384,14 +402,14 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Admin / Regulatory</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-teal-600">$</span>
-                    <input type="number" step="0.01" name="miscFees" value={formData.miscFees === 0 ? '' : formData.miscFees} onChange={handleChange} className={`w-full p-3 pl-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20 text-white focus:border-teal-400' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
+                    <input type="number" step="0.01" min="0" name="miscFees" value={formData.miscFees === 0 ? '' : formData.miscFees} onChange={handleChange} className={`w-full p-3 pl-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Equipment Lease</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-teal-600">$</span>
-                    <input type="number" step="0.01" name="equipmentFee" value={formData.equipmentFee === 0 ? '' : formData.equipmentFee} onChange={handleChange} className={`w-full p-3 pl-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20 text-white focus:border-teal-400' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
+                    <input type="number" step="0.01" min="0" name="equipmentFee" value={formData.equipmentFee === 0 ? '' : formData.equipmentFee} onChange={handleChange} className={`w-full p-3 pl-8 border rounded text-sm font-mono outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
                   </div>
                 </div>
               </div>
@@ -409,7 +427,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Service Term</label>
                   <div className="relative">
-                    <input type="number" name="contractTermMonths" value={formData.contractTermMonths === 0 ? '' : formData.contractTermMonths} onChange={handleChange} className={`w-full p-3 pr-14 border rounded text-sm font-black outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20 text-white focus:border-teal-400' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
+                    <input type="number" min="1" name="contractTermMonths" value={formData.contractTermMonths === 0 ? '' : formData.contractTermMonths} onChange={handleChange} className={`w-full p-3 pr-14 border rounded text-sm font-black outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-500 uppercase">MO</span>
                   </div>
                 </div>
@@ -429,35 +447,35 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Delivery</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">$</span>
-                    <input type="number" step="0.01" name="deliveryFee" value={formData.deliveryFee === 0 ? '' : formData.deliveryFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
+                    <input type="number" step="0.01" min="0" name="deliveryFee" value={formData.deliveryFee === 0 ? '' : formData.deliveryFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Removal</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">$</span>
-                    <input type="number" step="0.01" name="removalFee" value={formData.removalFee === 0 ? '' : formData.removalFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
+                    <input type="number" step="0.01" min="0" name="removalFee" value={formData.removalFee === 0 ? '' : formData.removalFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Swap / XPU</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">$</span>
-                    <input type="number" step="0.01" name="xpuFee" value={formData.xpuFee === 0 ? '' : formData.xpuFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
+                    <input type="number" step="0.01" min="0" name="xpuFee" value={formData.xpuFee === 0 ? '' : formData.xpuFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Overage Unit</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">$</span>
-                    <input type="number" step="0.01" name="overageFee" value={formData.overageFee === 0 ? '' : formData.overageFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
+                    <input type="number" step="0.01" min="0" name="overageFee" value={formData.overageFee === 0 ? '' : formData.overageFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
                   </div>
                 </div>
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">Contamination</label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500">$</span>
-                    <input type="number" step="0.01" name="contaminationFee" value={formData.contaminationFee === 0 ? '' : formData.contaminationFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
+                    <input type="number" step="0.01" min="0" name="contaminationFee" value={formData.contaminationFee === 0 ? '' : formData.contaminationFee} onChange={handleChange} className={`w-full p-2.5 pl-8 rounded text-xs font-mono outline-none border ${isDark ? 'bg-slate-900 border-teal-500/10 text-teal-400' : 'bg-white border-slate-200 text-teal-800'}`} />
                   </div>
                 </div>
               </div>

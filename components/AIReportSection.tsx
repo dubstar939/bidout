@@ -2,6 +2,7 @@
 import React from 'react';
 import { useTheme } from './ThemeContext';
 import { Icons } from '../constants';
+import ReactMarkdown from 'react-markdown';
 
 interface AIReportSectionProps {
   aiAnalysis: string;
@@ -61,7 +62,9 @@ const AIReportSection: React.FC<AIReportSectionProps> = ({
       </div>
       {aiAnalysis ? (
          <div className={`relative z-10 prose prose-invert max-w-none italic border-l pl-10 ${isDark ? 'text-slate-400 border-teal-500/20' : 'text-slate-600 border-slate-200'}`} role="region" aria-live="polite">
-            <p className={`whitespace-pre-wrap leading-relaxed text-base tracking-wide font-medium ${isDark ? 'text-slate-400' : 'text-slate-700'}`}>{aiAnalysis}</p>
+            <div className={`leading-relaxed text-base tracking-wide font-medium ${isDark ? 'text-slate-400' : 'text-slate-700'}`}>
+              <ReactMarkdown>{aiAnalysis}</ReactMarkdown>
+            </div>
             <div className="mt-12 flex items-center gap-6 no-print" data-html2canvas-ignore="true">
               <button onClick={onRunAnalysis} className={`text-[10px] font-black uppercase tracking-[0.3em] transition-all underline decoration-1 underline-offset-[12px] ${isDark ? 'text-[#2dd4bf] hover:text-white decoration-teal-500/30' : 'text-teal-700 hover:text-teal-900 decoration-teal-700/30'}`} aria-label="Re-initiate AI analysis">RE-INITIATE ANALYSIS</button>
               <div className={`h-1 w-1 rounded-full ${isDark ? 'bg-teal-500/30' : 'bg-slate-300'}`}></div>

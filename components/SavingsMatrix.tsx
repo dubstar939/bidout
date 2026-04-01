@@ -2,6 +2,7 @@ import React from 'react';
 import { CalculatedBid } from '../types';
 import { useTheme } from './ThemeContext';
 import { currencyFormat } from '../services/calculationUtils';
+import Tooltip from './Tooltip';
 
 interface SavingsMatrixProps {
   bids: CalculatedBid[];
@@ -27,10 +28,26 @@ const SavingsMatrix: React.FC<SavingsMatrixProps> = ({ bids }) => {
           <thead className={isDark ? 'bg-slate-950/40' : 'bg-slate-100/50'}>
             <tr>
               <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest">VECTOR ENTITY</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">OPEX DELTA (MO)</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">SETUP DELTA</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">ANNUAL YIELD</th>
-              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">NET RECOVERY</th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">
+                <Tooltip content="Monthly Operating Expense difference compared to the current baseline. Negative values indicate savings.">
+                  OPEX DELTA (MO)
+                </Tooltip>
+              </th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">
+                <Tooltip content="Difference in one-time setup, delivery, and removal fees compared to the baseline.">
+                  SETUP DELTA
+                </Tooltip>
+              </th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">
+                <Tooltip content="Projected annual savings based on monthly OpEx reduction.">
+                  ANNUAL YIELD
+                </Tooltip>
+              </th>
+              <th className="px-8 py-5 text-[10px] font-black text-slate-500 uppercase tracking-widest text-right">
+                <Tooltip content="Total lifecycle savings or loss over the full contract term, including all fixed and one-time costs.">
+                  NET RECOVERY
+                </Tooltip>
+              </th>
             </tr>
           </thead>
           <tbody className={`divide-y ${isDark ? 'divide-teal-500/10' : 'divide-slate-200'}`}>
@@ -73,7 +90,9 @@ const SavingsMatrix: React.FC<SavingsMatrixProps> = ({ bids }) => {
       <div className={`p-8 border-t flex items-start gap-6 transition-colors ${isDark ? 'bg-slate-950/60 border-teal-500/10' : 'bg-slate-50 border-slate-200'}`}>
         <div className={`w-1 self-stretch rounded-full transition-colors ${isDark ? 'bg-[#2dd4bf] shadow-[0_0_8px_#2dd4bf]' : 'bg-teal-700'}`}></div>
         <p className={`text-[10px] italic leading-loose uppercase tracking-[0.2em] font-bold max-w-4xl ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
-          <strong className={isDark ? 'text-teal-500/80' : 'text-teal-700'}>Normalization Strategy:</strong> Variance focus isolated to fixed Recurring OpEx and Up-front setups. Contingent event-load (Removal/Overage/XPU) is monitored but excluded from the recovery baseline to ensure fixed metric integrity.
+          <Tooltip content="The logic used to compare bids fairly by isolating fixed costs from variable event-based fees.">
+            <strong className={isDark ? 'text-teal-500/80' : 'text-teal-700'}>Normalization Strategy:</strong>
+          </Tooltip> Variance focus isolated to fixed Recurring OpEx and Up-front setups. Contingent event-load (Removal/Overage/XPU) is monitored but excluded from the recovery baseline to ensure fixed metric integrity.
         </p>
       </div>
     </div>

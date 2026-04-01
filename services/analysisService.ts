@@ -17,20 +17,28 @@ export const getAIAnalysis = async (bids: CalculatedBid[], analysisType: 'full' 
   const bestValue = bids.find(b => b.isBestValue);
 
   const prompt = `
-    You are a Senior Waste Audit Consultant. Analyze the following waste hauler bids and provide a ${analysisType === 'slim' ? 'concise executive summary' : 'detailed strategic report'}.
+    You are a Senior Waste Audit Consultant specializing in multi-vector waste contract decryption. 
+    Analyze the following waste hauler bids with absolute metric clarity and provide a ${analysisType === 'slim' ? 'concise executive summary' : 'detailed strategic report'}.
     
     Current Service: ${currentService ? JSON.stringify(currentService) : 'None provided'}
     Prospective Bids: ${JSON.stringify(prospectiveBids)}
     Best Value Identified: ${bestValue ? bestValue.haulerName : 'None'}
 
-    Focus on:
-    1. Cost savings (Annual and Total Term).
-    2. Surcharge structures (CPI, Fuel).
-    3. Hidden risks or contract term implications.
-    4. Clear recommendation on which hauler to award.
+    Normalization Strategy:
+    - Decrypt complex surcharge structures (CPI, Fuel, Environmental, Admin).
+    - Normalize all service frequencies to a standard monthly OpEx.
+    - Calculate absolute lifecycle cost (Total Contract Value) including one-time and contingent fees.
+    - Identify "Hidden Vector" risks (e.g., high contamination fees, aggressive CPI escalators).
 
-    Format the output as professional, technical, and authoritative text.
-    ${analysisType === 'slim' ? 'Keep it under 150 words.' : 'Provide a structured report with sections.'}
+    Focus on:
+    1. Cost savings (Annual and Total Term) with absolute precision.
+    2. Surcharge structures and their long-term impact on OpEx.
+    3. Hidden risks or contract term implications.
+    4. Clear, data-driven recommendation on which hauler to award.
+
+    Format the output as professional, technical, and authoritative Markdown text.
+    Use headings (###), bold text, and bullet points for clarity.
+    ${analysisType === 'slim' ? 'Keep it under 150 words.' : 'Provide a structured report with clear sections.'}
   `;
 
   try {

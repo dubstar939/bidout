@@ -9,21 +9,64 @@ interface MarketBidsSectionProps {
   prospectiveBids: CalculatedBid[];
   onEdit: (bid: CalculatedBid) => void;
   onDelete: (id: string) => void;
+  bidFilter: string;
+  setBidFilter: (filter: string) => void;
+  bidSort: 'asc' | 'desc';
+  setBidSort: (sort: 'asc' | 'desc') => void;
 }
 
 const MarketBidsSection: React.FC<MarketBidsSectionProps> = ({ 
   prospectiveBids, 
   onEdit, 
-  onDelete 
+  onDelete,
+  bidFilter,
+  setBidFilter,
+  bidSort,
+  setBidSort
 }) => {
   const { isDark } = useTheme();
 
   return (
     <section className="space-y-4">
-      <h2 className={`text-xs font-black uppercase tracking-[0.3em] flex items-center gap-4 ${isDark ? 'text-teal-500' : 'text-teal-700'}`}>
-        <span className={`h-4 w-1 shadow-[0_0_8px_rgba(45,212,191,0.5)] ${isDark ? 'bg-[#2dd4bf]' : 'bg-teal-700'}`}></span>
-        Market Opportunity Bids
-      </h2>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className={`text-xs font-black uppercase tracking-[0.3em] flex items-center gap-4 ${isDark ? 'text-teal-500' : 'text-teal-700'}`}>
+          <span className={`h-4 w-1 shadow-[0_0_8px_rgba(45,212,191,0.5)] ${isDark ? 'bg-[#2dd4bf]' : 'bg-teal-700'}`}></span>
+          Market Opportunity Bids
+        </h2>
+        
+        <div className="flex items-center gap-4 no-print" data-html2canvas-ignore="true">
+          <div className="flex items-center gap-2">
+            <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Filter:</span>
+            <select 
+              value={bidFilter}
+              onChange={(e) => setBidFilter(e.target.value)}
+              className={`text-[9px] font-black uppercase tracking-widest p-2 rounded border outline-none transition-all ${
+                isDark 
+                  ? 'bg-slate-900 border-teal-500/20 text-teal-100 focus:border-teal-500/50' 
+                  : 'bg-white border-slate-200 text-slate-700 focus:border-teal-600'
+              }`}
+            >
+              <option value="all">All Bids</option>
+              <option value="award">Award Potential</option>
+              <option value="peak">Peak Value Efficiency</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sort:</span>
+            <button 
+              onClick={() => setBidSort(bidSort === 'asc' ? 'desc' : 'asc')}
+              className={`text-[9px] font-black uppercase tracking-widest p-2 rounded border transition-all flex items-center gap-2 ${
+                isDark 
+                  ? 'bg-slate-900 border-teal-500/20 text-teal-100 hover:border-teal-500/50' 
+                  : 'bg-white border-slate-200 text-slate-700 hover:border-teal-600'
+              }`}
+            >
+              Value {bidSort === 'asc' ? '↑' : '↓'}
+            </button>
+          </div>
+        </div>
+      </div>
       {prospectiveBids.length > 0 ? (
         <div className="grid grid-cols-1 gap-4">
           {prospectiveBids.map(bid => (

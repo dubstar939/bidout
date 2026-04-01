@@ -27,6 +27,9 @@ const App: React.FC = () => {
   const [aiAnalysisType, setAiAnalysisType] = useState<'full' | 'slim'>('full');
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, message: string, onConfirm: () => void} | null>(null);
   
+  const [bidFilter, setBidFilter] = useState<string>('all');
+  const [bidSort, setBidSort] = useState<'asc' | 'desc'>('asc');
+
   const reportRef = useRef<HTMLDivElement>(null);
 
   const [facilityInfo, setFacilityInfo] = useState<FacilityInfo>({
@@ -77,7 +80,22 @@ const App: React.FC = () => {
   const calculatedBids = useMemo(() => calculateBidMetrics(bids), [bids]);
 
   const currentService = calculatedBids.find(b => b.isCurrent);
-  const prospectiveBids = calculatedBids.filter(b => !b.isCurrent);
+  
+  const prospectiveBids = useMemo(() => {
+    let filtered = calculatedBids.filter(b => !b.isCurrent);
+    
+    if (bidFilter === 'award') {
+      filtered = filtered.filter(b => b.status?.selected);
+    } else if (bidFilter === 'peak') {
+      filtered = filtered.filter(b => b.isBestValue && !b.status?.selected);
+    }
+    
+    return filtered.sort((a, b) => {
+      return bidSort === 'asc' 
+        ? a.totalContract - b.totalContract 
+        : b.totalContract - a.totalContract;
+    });
+  }, [calculatedBids, bidFilter, bidSort]);
 
   const handleSaveBid = (newBid: Bid) => {
     setBids(prev => {
@@ -299,6 +317,10 @@ const App: React.FC = () => {
               prospectiveBids={prospectiveBids}
               onEdit={handleEditBid}
               onDelete={handleDeleteBid}
+              bidFilter={bidFilter}
+              setBidFilter={setBidFilter}
+              bidSort={bidSort}
+              setBidSort={setBidSort}
             />
 
             {calculatedBids.length > 1 && (

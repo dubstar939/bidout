@@ -3,6 +3,7 @@ import { CalculatedBid } from '../types';
 import { Icons } from '../constants';
 import { useTheme } from './ThemeContext';
 import { currencyFormat } from '../services/calculationUtils';
+import Tooltip from './Tooltip';
 
 interface SavingsSummaryProps {
   bids: CalculatedBid[];
@@ -28,7 +29,9 @@ const SavingsSummary: React.FC<SavingsSummaryProps> = ({ bids }) => {
       {/* ANNUAL SAVINGS CARD */}
       <div className={`p-8 rounded border-l-4 shadow-2xl transition-all transform hover:scale-[1.02] ${isDark ? 'bg-[#0f172a] border-[#2dd4bf] border-slate-800' : 'bg-white border-teal-600 border-slate-200'}`}>
         <div className="flex justify-between items-start mb-4">
-          <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-teal-500/60' : 'text-slate-400'}`}>Projected Annual Yield</p>
+          <Tooltip content="Total projected savings over a 12-month period compared to current baseline.">
+            <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-teal-500/60' : 'text-slate-400'}`}>Projected Annual Yield</p>
+          </Tooltip>
           <div className={`p-2 rounded ${isDark ? 'bg-teal-500/10 text-teal-400' : 'bg-teal-50 text-teal-600'}`}>
             <Icons.TrendingDown />
           </div>
@@ -44,7 +47,9 @@ const SavingsSummary: React.FC<SavingsSummaryProps> = ({ bids }) => {
       {/* MONTHLY OPEX REDUCTION */}
       <div className={`p-8 rounded border-l-4 shadow-2xl transition-all transform hover:scale-[1.02] ${isDark ? 'bg-[#0f172a] border-cyan-400 border-slate-800' : 'bg-white border-cyan-600 border-slate-200'}`}>
         <div className="flex justify-between items-start mb-4">
-          <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-cyan-500/60' : 'text-slate-400'}`}>Monthly OpEx Delta</p>
+          <Tooltip content="The difference in fixed monthly operating costs (Base Rate + Surcharges).">
+            <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-cyan-500/60' : 'text-slate-400'}`}>Monthly OpEx Delta</p>
+          </Tooltip>
           <div className={`p-2 rounded ${isDark ? 'bg-cyan-500/10 text-cyan-400' : 'bg-cyan-50 text-cyan-600'}`}>
             <Icons.TrendingDown />
           </div>
@@ -60,7 +65,9 @@ const SavingsSummary: React.FC<SavingsSummaryProps> = ({ bids }) => {
       {/* TOTAL TERM RECOVERY */}
       <div className={`p-8 rounded border-l-4 shadow-2xl transition-all transform hover:scale-[1.02] ${isDark ? 'bg-[#0f172a] border-indigo-400 border-slate-800' : 'bg-white border-indigo-600 border-slate-200'}`}>
         <div className="flex justify-between items-start mb-4">
-          <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-indigo-500/60' : 'text-slate-400'}`}>Total Term Recovery</p>
+          <Tooltip content="Total savings over the entire contract lifecycle, accounting for all fixed and one-time fees.">
+            <p className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-indigo-500/60' : 'text-slate-400'}`}>Total Term Recovery</p>
+          </Tooltip>
           <div className={`p-2 rounded ${isDark ? 'bg-indigo-500/10 text-indigo-400' : 'bg-indigo-50 text-indigo-600'}`}>
             <Icons.TrendingDown />
           </div>

@@ -1,14 +1,15 @@
 import React from 'react';
 import { CalculatedBid } from '../types';
 import { Icons } from '../constants';
+import { useTheme } from './ThemeContext';
+import { currencyFormat } from '../services/calculationUtils';
 
 interface SavingsSummaryProps {
   bids: CalculatedBid[];
-  theme: 'light' | 'dark';
 }
 
-const SavingsSummary: React.FC<SavingsSummaryProps> = ({ bids, theme }) => {
-  const isDark = theme === 'dark';
+const SavingsSummary: React.FC<SavingsSummaryProps> = ({ bids }) => {
+  const { isDark } = useTheme();
   const currentService = bids.find(b => b.isCurrent);
   const prospectiveBids = bids.filter(b => !b.isCurrent);
   
@@ -21,8 +22,6 @@ const SavingsSummary: React.FC<SavingsSummaryProps> = ({ bids, theme }) => {
   const annualSavings = currentService.totalAnnualOpEx - bestBid.totalAnnualOpEx;
   const termSavings = currentService.totalContract - bestBid.totalContract;
   const monthlySavings = currentService.totalMonthlyOpEx - bestBid.totalMonthlyOpEx;
-
-  const currencyFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">

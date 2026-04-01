@@ -1,18 +1,33 @@
 import React, { useState, useEffect } from 'react';
 import { Bid, ServiceLineItem } from '../types';
-import { Icons, COLORS } from '../constants';
+import { Icons } from '../constants';
+import { useTheme } from './ThemeContext';
 
 interface BidFormProps {
   onSave: (bid: Bid) => void;
   onCancel: () => void;
   onConfirmRequest: (message: string, onConfirm: () => void) => void;
   initialData?: Bid | null;
-  theme: 'light' | 'dark';
 }
 
-const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, initialData, theme }) => {
-  const isDark = theme === 'dark';
+const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, initialData }) => {
+  const { isDark } = useTheme();
   
+  const StatusBadge = ({ label, active, onClick, icon, activeClass }: { label: string, active: boolean, onClick: () => void, icon: React.ReactNode, activeClass: string }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all border ${
+        active 
+          ? `${activeClass} shadow-lg scale-105` 
+          : `${isDark ? 'bg-slate-900/40 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'} opacity-60 hover:opacity-100`
+      }`}
+    >
+      <span className={active ? 'opacity-100' : 'opacity-40'}>{icon}</span>
+      {label}
+    </button>
+  );
+
   const emptyForm: Partial<Bid> = {
     isCurrent: false,
     haulerName: '',
@@ -181,7 +196,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
         <h2 className={`text-xs font-black uppercase tracking-[0.4em] ${isDark ? 'text-[#2dd4bf] drop-shadow-[0_0_8px_rgba(45,212,191,0.3)]' : 'text-teal-700'}`}>
           {formData.isCurrent ? 'Baseline Audit Profile' : 'Market Worksheet HUD'}
         </h2>
-        <div className="flex flex-wrap items-center gap-8">
+        <div className="flex flex-wrap items-center gap-6">
            <label className="flex items-center gap-3 cursor-pointer group">
               <input 
                 type="checkbox" 
@@ -193,67 +208,50 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
            </label>
            
             {!formData.isCurrent && (
-              <>
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
-                    className={`w-5 h-5 rounded border ${isDark ? 'accent-cyan-400 bg-slate-900 border-cyan-500/30' : 'accent-cyan-600 border-slate-300'}`} 
-                    checked={formData.status?.selected || false} 
-                    onChange={() => toggleStatus('selected')} 
-                  />
-                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-cyan-400' : 'text-slate-500 group-hover:text-cyan-600'}`}>FLAG FOR AWARD</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
-                    className={`w-5 h-5 rounded border ${isDark ? 'accent-indigo-400 bg-slate-900 border-indigo-500/30' : 'accent-indigo-600 border-slate-300'}`} 
-                    checked={formData.status?.addendumSent || false} 
-                    onChange={() => toggleStatus('addendumSent')} 
-                  />
-                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-indigo-400' : 'text-slate-500 group-hover:text-indigo-600'}`}>ADDENDUM SENT</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
-                    className={`w-5 h-5 rounded border ${isDark ? 'accent-purple-400 bg-slate-900 border-purple-500/30' : 'accent-purple-600 border-slate-300'}`} 
-                    checked={formData.status?.agreementRequested || false} 
-                    onChange={() => toggleStatus('agreementRequested')} 
-                  />
-                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-purple-400' : 'text-slate-500 group-hover:text-purple-600'}`}>AGREEMENT REQ</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
-                    className={`w-5 h-5 rounded border ${isDark ? 'accent-pink-400 bg-slate-900 border-pink-500/30' : 'accent-pink-600 border-slate-300'}`} 
-                    checked={formData.status?.sentToCustomer || false} 
-                    onChange={() => toggleStatus('sentToCustomer')} 
-                  />
-                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-pink-400' : 'text-slate-500 group-hover:text-pink-600'}`}>SENT TO CUST</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
-                    className={`w-5 h-5 rounded border ${isDark ? 'accent-orange-400 bg-slate-900 border-orange-500/30' : 'accent-orange-600 border-slate-300'}`} 
-                    checked={formData.status?.sentToHauler || false} 
-                    onChange={() => toggleStatus('sentToHauler')} 
-                  />
-                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-orange-400' : 'text-slate-500 group-hover:text-orange-600'}`}>SENT TO HAULER</span>
-                </label>
-
-                <label className="flex items-center gap-3 cursor-pointer group">
-                  <input 
-                    type="checkbox" 
-                    className={`w-5 h-5 rounded border ${isDark ? 'accent-emerald-400 bg-slate-900 border-emerald-500/30' : 'accent-emerald-600 border-slate-300'}`} 
-                    checked={formData.status?.loadedToDatabase || false} 
-                    onChange={() => toggleStatus('loadedToDatabase')} 
-                  />
-                  <span className={`text-[10px] font-black uppercase tracking-widest transition-colors ${isDark ? 'text-slate-400 group-hover:text-emerald-400' : 'text-slate-500 group-hover:text-emerald-600'}`}>LOADED TO DB</span>
-                </label>
-              </>
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusBadge 
+                  label="FLAG FOR AWARD" 
+                  active={formData.status?.selected || false} 
+                  onClick={() => toggleStatus('selected')} 
+                  icon={<Icons.CheckCircle />}
+                  activeClass={isDark ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' : 'bg-cyan-50 text-cyan-700 border-cyan-200'}
+                />
+                <StatusBadge 
+                  label="ADDENDUM SENT" 
+                  active={formData.status?.addendumSent || false} 
+                  onClick={() => toggleStatus('addendumSent')} 
+                  icon={<Icons.FileText />}
+                  activeClass={isDark ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/50' : 'bg-indigo-50 text-indigo-700 border-indigo-200'}
+                />
+                <StatusBadge 
+                  label="AGREEMENT REQ" 
+                  active={formData.status?.agreementRequested || false} 
+                  onClick={() => toggleStatus('agreementRequested')} 
+                  icon={<Icons.Clock />}
+                  activeClass={isDark ? 'bg-purple-500/20 text-purple-400 border-purple-500/50' : 'bg-purple-50 text-purple-700 border-purple-200'}
+                />
+                <StatusBadge 
+                  label="SENT TO CUST" 
+                  active={formData.status?.sentToCustomer || false} 
+                  onClick={() => toggleStatus('sentToCustomer')} 
+                  icon={<Icons.Send />}
+                  activeClass={isDark ? 'bg-pink-500/20 text-pink-400 border-pink-500/50' : 'bg-pink-50 text-pink-700 border-pink-200'}
+                />
+                <StatusBadge 
+                  label="SENT TO HAULER" 
+                  active={formData.status?.sentToHauler || false} 
+                  onClick={() => toggleStatus('sentToHauler')} 
+                  icon={<Icons.Send />}
+                  activeClass={isDark ? 'bg-orange-500/20 text-orange-400 border-orange-500/50' : 'bg-orange-50 text-orange-700 border-orange-200'}
+                />
+                <StatusBadge 
+                  label="LOADED TO DB" 
+                  active={formData.status?.loadedToDatabase || false} 
+                  onClick={() => toggleStatus('loadedToDatabase')} 
+                  icon={<Icons.Database />}
+                  activeClass={isDark ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}
+                />
+              </div>
             )}
         </div>
       </div>
@@ -316,12 +314,15 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                     <td className="p-3"><input placeholder="2X/WK" value={service.frequency} onChange={e => handleServiceChange(service.id, 'frequency', e.target.value)} className={`w-full p-2.5 text-xs rounded outline-none border ${isDark ? 'bg-slate-950/40 border-teal-500/10 text-teal-200' : 'bg-white border-slate-200 text-slate-800'}`} /></td>
                     <td className="p-3"><input placeholder="M, TH" value={service.days} onChange={e => handleServiceChange(service.id, 'days', e.target.value)} className={`w-full p-2.5 text-xs rounded outline-none border ${isDark ? 'bg-slate-950/40 border-teal-500/10 text-teal-200' : 'bg-white border-slate-200 text-slate-800'}`} /></td>
                     <td className="p-3">
-                      <input 
-                        type="text" 
-                        value={serviceInputStrings[service.id]?.rate || ''} 
-                        onChange={e => handleServiceNumericInputChange(service.id, 'rate', e.target.value)}
-                        className={`w-full p-2.5 text-xs font-mono font-black rounded outline-none border ${isDark ? 'bg-slate-950/40 border-[#2dd4bf]/20 text-white focus:border-[#2dd4bf]' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-700'}`} 
-                      />
+                      <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-teal-600">$</span>
+                        <input 
+                          type="text" 
+                          value={serviceInputStrings[service.id]?.rate || ''} 
+                          onChange={e => handleServiceNumericInputChange(service.id, 'rate', e.target.value)}
+                          className={`w-full p-2.5 pl-6 text-xs font-mono font-black rounded outline-none border ${isDark ? 'bg-slate-950/40 border-[#2dd4bf]/20 text-white focus:border-[#2dd4bf]' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-700'}`} 
+                        />
+                      </div>
                     </td>
                     <td className="p-3 text-center">
                       <button type="button" onClick={() => removeServiceLine(service.id)} className={`transition-colors ${isDark ? 'text-slate-600 hover:text-red-500' : 'text-slate-300 hover:text-red-600'}`}><Icons.Trash /></button>

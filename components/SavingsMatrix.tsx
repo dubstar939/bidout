@@ -1,19 +1,18 @@
 import React from 'react';
 import { CalculatedBid } from '../types';
+import { useTheme } from './ThemeContext';
+import { currencyFormat } from '../services/calculationUtils';
 
 interface SavingsMatrixProps {
   bids: CalculatedBid[];
-  theme: 'light' | 'dark';
 }
 
-const SavingsMatrix: React.FC<SavingsMatrixProps> = ({ bids, theme }) => {
-  const isDark = theme === 'dark';
+const SavingsMatrix: React.FC<SavingsMatrixProps> = ({ bids }) => {
+  const { isDark } = useTheme();
   const currentService = bids.find(b => b.isCurrent);
   const prospectiveBids = bids.filter(b => !b.isCurrent);
   
   if (!currentService || prospectiveBids.length === 0) return null;
-
-  const currencyFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 
   return (
     <div className={`rounded border shadow-2xl overflow-hidden backdrop-blur-md transition-colors ${isDark ? 'bg-[#1e293b]/60 border-teal-500/20' : 'bg-white border-slate-200'}`}>

@@ -9,11 +9,12 @@ import { CalculatedBid } from "../types";
 export const getAIAnalysis = async (bids: CalculatedBid[], analysisType: 'full' | 'slim'): Promise<string> => {
   if (bids.length === 0) return "Add at least two bids (Current vs Prospective) to generate a strategic analysis.";
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  // Check both process.env and import.meta.env for the API key
+  const apiKey = (import.meta.env as any).VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
   
-  if (!apiKey) {
+  if (!apiKey || apiKey === "" || apiKey === "undefined") {
     console.error("GEMINI_API_KEY is missing from the environment.");
-    return "The AI Intelligence Engine is currently offline (API Key Missing). Please ensure your Gemini API key is configured in the application settings.";
+    return "The AI Intelligence Engine is currently offline (API Key Missing). Please ensure your Gemini API key is configured in the application settings (Settings > Secrets). If you are in AI Studio, this key should be automatically provided.";
   }
 
   const ai = new GoogleGenAI({ apiKey });

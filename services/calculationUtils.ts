@@ -2,6 +2,11 @@
 import { Bid, CalculatedBid } from '../types';
 
 export const calculateBidMetrics = (bids: Bid[]): CalculatedBid[] => {
+  if (bids.length === 0) return [];
+
+  // Single pass to calculate basic metrics and find min cost for prospective bids
+  let minProspectiveCost = Infinity;
+  
   const results = bids.map(bid => {
     const servicesMonthly = (bid.services || []).reduce((acc, s) => acc + (s.rate || 0), 0);
     
@@ -22,10 +27,12 @@ export const calculateBidMetrics = (bids: Bid[]): CalculatedBid[] => {
       (bid.contaminationFee || 0);
 
     const totalMonthlyOpEx = servicesMonthly + recurringFeesMonthly;
-    const totalAnnualOpEx = totalMonthlyOpEx * 12;
-    
     const termRecurringTotal = totalMonthlyOpEx * (bid.contractTermMonths || 36);
     const totalContract = termRecurringTotal + oneTimeFees;
+
+    if (!bid.isCurrent && totalContract < minProspectiveCost) {
+      minProspectiveCost = totalContract;
+    }
 
     return {
       ...bid,
@@ -34,25 +41,34 @@ export const calculateBidMetrics = (bids: Bid[]): CalculatedBid[] => {
       oneTimeFees,
       contingentFees,
       totalMonthlyOpEx,
-      totalAnnualOpEx,
+      totalAnnualOpEx: totalMonthlyOpEx * 12,
       totalContract,
+      termRecurringTotal, // Added for chart consistency
       isBestValue: false,
     };
   });
 
-  if (results.length === 0) return [];
-  
-  const prospective = results.filter(b => !b.isCurrent);
-  if (prospective.length > 0) {
-    const minCost = Math.min(...prospective.map(r => r.totalContract));
-    return results.map(r => ({
-      ...r,
-      isBestValue: !r.isCurrent && r.totalContract === minCost,
-    }));
-  }
-  
-  return results;
+  // Second pass only to set isBestValue flag
+  return results.map(r => ({
+    ...r,
+    isBestValue: !r.isCurrent && r.totalContract === minProspectiveCost && minProspectiveCost !== Infinity,
+  }));
 };
+
+/**
+ * Performance Note:
+ * Time Complexity: O(N) where N is the number of bids.
+ * Space Complexity: O(N) to store the results.
+ * 
+ * Benchmarking Suggestion:
+ * Use performance.now() to measure execution time for large datasets.
+ * Example Format:
+ * | Dataset Size | Execution Time (ms) |
+ * |--------------|---------------------|
+ * | 10 bids      | 0.05ms              |
+ * | 100 bids     | 0.45ms              |
+ * | 1000 bids    | 3.20ms              |
+ */
 
 export const validateBid = (bid: Partial<Bid>): string[] => {
   const errors: string[] = [];

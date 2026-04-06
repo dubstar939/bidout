@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Bid, CalculatedBid, FacilityInfo } from './types';
 import BidForm from './components/BidForm';
 import SavingsMatrix from './components/SavingsMatrix';
@@ -9,16 +9,63 @@ import MarketBidsSection from './components/MarketBidsSection';
 import AIReportSection from './components/AIReportSection';
 import ConfirmDialog from './components/ConfirmDialog';
 import { getAIAnalysis } from './services/analysisService';
-import { calculateBidMetrics } from './services/calculationUtils';
+import { calculateBidMetrics, currencyFormat } from './services/calculationUtils';
 import { useTheme } from './components/ThemeContext';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
-import { currencyFormat } from './services/calculationUtils';
+
+/**
+ * Custom hook to manage audit data persistence and state.
+ * Adheres to Single Responsibility Principle.
+ */
+const useAuditData = () => {
+  const [bids, setBids] = useState<Bid[]>([]);
+  const [facilityInfo, setFacilityInfo] = useState<FacilityInfo>({
+    facilityName: '',
+    facId: '',
+    address: '',
+    pocNameNumber: ''
+  });
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    const savedBids = localStorage.getItem('audit_bids');
+    const savedFacility = localStorage.getItem('audit_facility');
+    if (savedBids) {
+      try { setBids(JSON.parse(savedBids)); } catch (e) { console.error("Failed to parse saved bids"); }
+    }
+    if (savedFacility) {
+      try { setFacilityInfo(JSON.parse(savedFacility)); } catch (e) { console.error("Failed to parse facility info"); }
+    }
+  }, []);
+
+  // Sync to localStorage on changes
+  useEffect(() => {
+    if (bids.length > 0) localStorage.setItem('audit_bids', JSON.stringify(bids));
+    else localStorage.removeItem('audit_bids');
+  }, [bids]);
+
+  useEffect(() => {
+    const hasData = Object.values(facilityInfo).some(val => val !== '');
+    if (hasData) localStorage.setItem('audit_facility', JSON.stringify(facilityInfo));
+    else localStorage.removeItem('audit_facility');
+  }, [facilityInfo]);
+
+  const wipeData = useCallback(() => {
+    setBids([]);
+    setFacilityInfo({ facilityName: '', facId: '', address: '', pocNameNumber: '' });
+    localStorage.removeItem('audit_bids');
+    localStorage.removeItem('audit_facility');
+  }, []);
+
+  return { bids, setBids, facilityInfo, setFacilityInfo, wipeData };
+};
 
 const App: React.FC = () => {
   const { isDark } = useTheme();
-  const [bids, setBids] = useState<Bid[]>([]);
+  const { bids, setBids, facilityInfo, setFacilityInfo, wipeData } = useAuditData();
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingBid, setEditingBid] = useState<Bid | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
@@ -32,54 +79,8 @@ const App: React.FC = () => {
 
   const reportRef = useRef<HTMLDivElement>(null);
 
-  const [facilityInfo, setFacilityInfo] = useState<FacilityInfo>({
-    facilityName: '',
-    facId: '',
-    address: '',
-    pocNameNumber: ''
-  });
-
-  // Load from localStorage on mount
-  useEffect(() => {
-    const savedBids = localStorage.getItem('audit_bids');
-    const savedFacility = localStorage.getItem('audit_facility');
-    if (savedBids) {
-      try {
-        setBids(JSON.parse(savedBids));
-      } catch (e) {
-        console.error("Failed to parse saved bids");
-      }
-    }
-    if (savedFacility) {
-      try {
-        setFacilityInfo(JSON.parse(savedFacility));
-      } catch (e) {
-        console.error("Failed to parse facility info");
-      }
-    }
-  }, []);
-
-  // Sync to localStorage on changes
-  useEffect(() => {
-    if (bids.length > 0) {
-      localStorage.setItem('audit_bids', JSON.stringify(bids));
-    } else {
-      localStorage.removeItem('audit_bids');
-    }
-  }, [bids]);
-
-  useEffect(() => {
-    const hasData = Object.values(facilityInfo).some(val => val !== '');
-    if (hasData) {
-      localStorage.setItem('audit_facility', JSON.stringify(facilityInfo));
-    } else {
-      localStorage.removeItem('audit_facility');
-    }
-  }, [facilityInfo]);
-
   const calculatedBids = useMemo(() => calculateBidMetrics(bids), [bids]);
-
-  const currentService = calculatedBids.find(b => b.isCurrent);
+  const currentService = useMemo(() => calculatedBids.find(b => b.isCurrent), [calculatedBids]);
   
   const prospectiveBids = useMemo(() => {
     let filtered = calculatedBids.filter(b => !b.isCurrent);
@@ -97,7 +98,7 @@ const App: React.FC = () => {
     });
   }, [calculatedBids, bidFilter, bidSort]);
 
-  const handleSaveBid = (newBid: Bid) => {
+  const handleSaveBid = useCallback((newBid: Bid) => {
     setBids(prev => {
       const filtered = prev.filter(b => b.id !== newBid.id);
       if (newBid.isCurrent) {
@@ -107,26 +108,19 @@ const App: React.FC = () => {
     });
     setIsFormOpen(false);
     setEditingBid(null);
-  };
+  }, [setBids]);
 
-  const handleEditBid = (bid: Bid) => {
-    // Strip calculated fields before editing
+  const handleEditBid = useCallback((bid: Bid) => {
     const { 
-      servicesMonthly, 
-      recurringFeesMonthly, 
-      oneTimeFees, 
-      contingentFees,
-      totalMonthlyOpEx, 
-      totalAnnualOpEx, 
-      totalContract, 
-      isBestValue, 
+      servicesMonthly, recurringFeesMonthly, oneTimeFees, contingentFees,
+      totalMonthlyOpEx, totalAnnualOpEx, totalContract, isBestValue, termRecurringTotal,
       ...originalBid 
     } = bid as any;
     setEditingBid(originalBid as Bid);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleDeleteBid = (id: string) => {
+  const handleDeleteBid = useCallback((id: string) => {
     setConfirmDialog({
       isOpen: true,
       message: 'Delete this specific worksheet from the audit session?',
@@ -135,37 +129,34 @@ const App: React.FC = () => {
         setConfirmDialog(null);
       }
     });
-  };
+  }, [setBids]);
 
-  const handleWipeSession = () => {
+  const handleWipeSession = useCallback(() => {
     setConfirmDialog({
       isOpen: true,
       message: 'CRITICAL ACTION: This will erase all facility identity data and ALL current/prospective bid worksheets. This cannot be undone. Proceed?',
       onConfirm: () => {
-        setBids([]);
+        wipeData();
         setAiAnalysis('');
-        setFacilityInfo({
-          facilityName: '',
-          facId: '',
-          address: '',
-          pocNameNumber: ''
-        });
         setIsFormOpen(false);
         setEditingBid(null);
-        localStorage.removeItem('audit_bids');
-        localStorage.removeItem('audit_facility');
         setConfirmDialog(null);
       }
     });
-  };
+  }, [wipeData]);
 
   const runAnalysis = async () => {
+    if (calculatedBids.length < 2) return;
+    
     setIsAnalyzing(true);
+    const currentBids = [...calculatedBids]; // Snapshot to avoid race conditions
+    
     try {
-      const analysis = await getAIAnalysis(calculatedBids, aiAnalysisType);
+      const analysis = await getAIAnalysis(currentBids, aiAnalysisType);
       setAiAnalysis(analysis);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Analysis failed:", error);
+      setAiAnalysis(`Analysis failed: ${error.message || 'Unknown error'}`);
     } finally {
       setIsAnalyzing(false);
     }

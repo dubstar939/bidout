@@ -7,9 +7,16 @@ import { CalculatedBid } from "../types";
  * @param analysisType - Type of analysis: 'full' for detailed report, 'slim' for executive summary.
  */
 export const getAIAnalysis = async (bids: CalculatedBid[], analysisType: 'full' | 'slim'): Promise<string> => {
-  if (bids.length === 0) return "Add some bids to start analysis.";
+  if (bids.length === 0) return "Add at least two bids (Current vs Prospective) to generate a strategic analysis.";
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const apiKey = process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    console.error("GEMINI_API_KEY is missing from the environment.");
+    return "The AI Intelligence Engine is currently offline (API Key Missing). Please ensure your Gemini API key is configured in the application settings.";
+  }
+
+  const ai = new GoogleGenAI({ apiKey });
   const model = "gemini-3-flash-preview";
 
   const currentService = bids.find(b => b.isCurrent);
@@ -17,28 +24,29 @@ export const getAIAnalysis = async (bids: CalculatedBid[], analysisType: 'full' 
   const bestValue = bids.find(b => b.isBestValue);
 
   const prompt = `
-    You are a Senior Waste Audit Consultant specializing in multi-vector waste contract decryption. 
-    Analyze the following waste hauler bids with absolute metric clarity and provide a ${analysisType === 'slim' ? 'concise executive summary' : 'detailed strategic report'}.
+    You are a Senior Waste Audit Strategist. Your goal is to provide a clear, actionable analysis of waste hauling bids for a facility manager.
     
-    Current Service: ${currentService ? JSON.stringify(currentService) : 'None provided'}
-    Prospective Bids: ${JSON.stringify(prospectiveBids)}
-    Best Value Identified: ${bestValue ? bestValue.haulerName : 'None'}
+    Analysis Mode: ${analysisType === 'full' ? 'Comprehensive Strategic Report' : 'Executive Summary'}
+    
+    Data Context:
+    - Current Baseline: ${currentService ? `${currentService.haulerName} at ${currentService.totalMonthlyOpEx}/mo` : 'Not provided'}
+    - Prospective Options: ${prospectiveBids.map(b => `${b.haulerName} (${b.totalMonthlyOpEx}/mo, Total Term: ${b.totalContract})`).join(', ')}
+    - Primary Recommendation: ${bestValue ? bestValue.haulerName : 'Pending further data'}
 
-    Normalization Strategy:
-    - Decrypt complex surcharge structures (CPI, Fuel, Environmental, Admin).
-    - Normalize all service frequencies to a standard monthly OpEx.
-    - Calculate absolute lifecycle cost (Total Contract Value) including one-time and contingent fees.
-    - Identify "Hidden Vector" risks (e.g., high contamination fees, aggressive CPI escalators).
+    Strategic Objectives:
+    1. Standardize all costs to a monthly "Apples-to-Apples" comparison.
+    2. Identify hidden surcharges (Fuel, Environmental, Admin) that inflate the base rate.
+    3. Evaluate the "Total Cost of Ownership" over the full contract term.
+    4. Highlight specific risks like aggressive price escalators or excessive contamination fees.
 
-    Focus on:
-    1. Cost savings (Annual and Total Term) with absolute precision.
-    2. Surcharge structures and their long-term impact on OpEx.
-    3. Hidden risks or contract term implications.
-    4. Clear, data-driven recommendation on which hauler to award.
-
-    Format the output as professional, technical, and authoritative Markdown text.
-    Use headings (###), bold text, and bullet points for clarity.
-    ${analysisType === 'slim' ? 'Keep it under 150 words.' : 'Provide a structured report with clear sections.'}
+    Report Structure:
+    - ${analysisType === 'slim' ? 'Executive Summary: Provide a 2-3 paragraph high-level recommendation.' : 'Detailed Analysis: Break down by Cost Efficiency, Risk Assessment, and Final Recommendation.'}
+    
+    Language Guidelines:
+    - Use clear, non-technical language where possible.
+    - Be authoritative but accessible.
+    - Use Markdown formatting (### for headers, **bold** for emphasis).
+    - If a bid is significantly better, explain WHY (e.g., "Lower base rate despite higher surcharges").
   `;
 
   try {
@@ -46,9 +54,19 @@ export const getAIAnalysis = async (bids: CalculatedBid[], analysisType: 'full' 
       model,
       contents: prompt,
     });
-    return response.text || "Failed to generate analysis.";
-  } catch (error) {
+
+    if (!response || !response.text) {
+      throw new Error("Empty response from Gemini API");
+    }
+
+    return response.text;
+  } catch (error: any) {
     console.error("Gemini Analysis Error:", error);
-    return "The AI normalization engine encountered an error. Please try again later.";
+    
+    if (error.message?.includes("API key not valid")) {
+      return "The provided Gemini API key is invalid. Please check your configuration.";
+    }
+    
+    return `The Strategic Analysis engine encountered an error: ${error.message || 'Unknown Error'}. Please try again in a few moments.`;
   }
 };

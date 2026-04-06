@@ -13,6 +13,8 @@ interface MarketBidsSectionProps {
   setBidFilter: (filter: string) => void;
   bidSort: 'asc' | 'desc';
   setBidSort: (sort: 'asc' | 'desc') => void;
+  isComparisonView: boolean;
+  setIsComparisonView: (isComparison: boolean) => void;
 }
 
 const MarketBidsSection: React.FC<MarketBidsSectionProps> = ({ 
@@ -22,9 +24,13 @@ const MarketBidsSection: React.FC<MarketBidsSectionProps> = ({
   bidFilter,
   setBidFilter,
   bidSort,
-  setBidSort
+  setBidSort,
+  isComparisonView,
+  setIsComparisonView
 }) => {
   const { isDark } = useTheme();
+
+  const selectedBidsCount = prospectiveBids.filter(b => b.status?.selected).length;
 
   return (
     <section className="space-y-4">
@@ -35,6 +41,20 @@ const MarketBidsSection: React.FC<MarketBidsSectionProps> = ({
         </h2>
         
         <div className="flex items-center gap-4 no-print" data-html2canvas-ignore="true">
+          {selectedBidsCount > 0 && (
+            <button 
+              onClick={() => setIsComparisonView(!isComparisonView)}
+              className={`text-[9px] font-black uppercase tracking-widest p-2 px-4 rounded border transition-all flex items-center gap-2 ${
+                isComparisonView
+                  ? (isDark ? 'bg-teal-500 text-slate-950 border-teal-500' : 'bg-teal-600 text-white border-teal-600')
+                  : (isDark ? 'bg-slate-900 border-teal-500/20 text-teal-100 hover:border-teal-500/50' : 'bg-white border-slate-200 text-slate-700 hover:border-teal-600')
+              }`}
+            >
+              <Icons.Layout className="w-3 h-3" />
+              {isComparisonView ? 'List View' : `Compare Selected (${selectedBidsCount})`}
+            </button>
+          )}
+
           <div className="flex items-center gap-2">
             <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Filter:</span>
             <select 

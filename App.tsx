@@ -7,6 +7,7 @@ import Header from './components/Header';
 import BaselineSection from './components/BaselineSection';
 import MarketBidsSection from './components/MarketBidsSection';
 import AIReportSection from './components/AIReportSection';
+import ComparisonView from './components/ComparisonView';
 import ConfirmDialog from './components/ConfirmDialog';
 import { getAIAnalysis } from './services/analysisService';
 import { calculateBidMetrics, currencyFormat } from './services/calculationUtils';
@@ -76,6 +77,7 @@ const App: React.FC = () => {
   
   const [bidFilter, setBidFilter] = useState<string>('all');
   const [bidSort, setBidSort] = useState<'asc' | 'desc'>('asc');
+  const [isComparisonView, setIsComparisonView] = useState(false);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
@@ -312,7 +314,17 @@ const App: React.FC = () => {
               setBidFilter={setBidFilter}
               bidSort={bidSort}
               setBidSort={setBidSort}
+              isComparisonView={isComparisonView}
+              setIsComparisonView={setIsComparisonView}
             />
+
+            {isComparisonView && (
+              <ComparisonView 
+                selectedBids={prospectiveBids.filter(b => b.status?.selected)}
+                currentService={currentService}
+                onClose={() => setIsComparisonView(false)}
+              />
+            )}
 
             {calculatedBids.length > 1 && (
               <section className={`space-y-8 pt-8 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>

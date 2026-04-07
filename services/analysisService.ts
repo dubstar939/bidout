@@ -9,6 +9,14 @@ export const getAIAnalysis = async (bids: CalculatedBid[], analysisType: 'full' 
   if (bids.length === 0) return "Add at least two bids (Current vs Prospective) to generate a strategic analysis.";
 
   try {
+    // 1. Verify server health first
+    const healthResponse = await fetch("/api/health").catch(() => null);
+    if (!healthResponse || !healthResponse.ok) {
+      console.error("Server health check failed");
+      return "The Strategic Analysis engine is currently offline. The server is not responding correctly. Please try again in a few moments.";
+    }
+
+    // 2. Make the analysis request
     const response = await fetch("/api/analyze", {
       method: "POST",
       headers: {
@@ -16,6 +24,19 @@ export const getAIAnalysis = async (bids: CalculatedBid[], analysisType: 'full' 
       },
       body: JSON.stringify({ bids, analysisType }),
     });
+
+    // 3. Check if the response is JSON before parsing
+    const contentType = response.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      const text = await response.text();
+      console.error("Non-JSON response received:", text);
+      
+      if (text.includes("The page could not be found") || response.status === 404) {
+        return "The Strategic Analysis engine encountered a routing error (404). This usually happens if the server is still starting up. Please refresh the page and try again in 10 seconds.";
+      }
+      
+      throw new Error(`Server returned an invalid response (not JSON). Status: ${response.status}`);
+    }
 
     const data = await response.json();
 

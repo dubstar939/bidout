@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Bid, ServiceLineItem } from '../types';
 import { Icons } from '../constants';
 import { useTheme } from './ThemeContext';
-import { validateBid } from '../services/calculationUtils';
+import { validateBid, generateId } from '../services/calculationUtils';
 import Tooltip from './Tooltip';
 
 interface BidFormProps {
@@ -101,7 +101,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
   };
 
   const addServiceLine = () => {
-    const newServiceId = Date.now().toString();
+    const newServiceId = generateId();
     setFormData(prev => ({
       ...prev,
       services: [...(prev.services || []), {
@@ -188,7 +188,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
     setErrors([]);
     onSave({
       ...formData,
-      id: initialData?.id || Date.now().toString(),
+      id: initialData?.id || generateId(),
     } as Bid);
   };
 

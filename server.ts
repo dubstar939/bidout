@@ -13,8 +13,14 @@ async function startServer() {
 
   app.use(express.json());
 
+  // Health check route
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
+
   // API Route for AI Analysis
   app.post("/api/analyze", async (req, res) => {
+    console.log("Received analysis request");
     const { bids, analysisType } = req.body;
     
     const apiKey = process.env.GEMINI_API_KEY;
@@ -82,7 +88,9 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  const isProd = process.env.NODE_ENV === "production";
+  
+  if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -96,8 +104,14 @@ async function startServer() {
     });
   }
 
+  // Error handling middleware
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error("Server Error:", err);
+    res.status(500).json({ error: "Internal Server Error", message: err.message });
+  });
+
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on http://localhost:${PORT} (Mode: ${isProd ? 'production' : 'development'})`);
   });
 }
 

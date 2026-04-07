@@ -81,3 +81,11 @@ export const validateBid = (bid: Partial<Bid>): string[] => {
 };
 
 export const currencyFormat = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
+
+export const generateId = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for non-secure contexts or older browsers
+  return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+};

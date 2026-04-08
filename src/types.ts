@@ -52,6 +52,9 @@ export interface CalculationResults {
   breakdown: {
     services: number;
     fixedFees: number;
+    percentageFees: number;
+    perHaulFees: number;
+    perTonFees: number;
     variableFees: number;
   };
 }

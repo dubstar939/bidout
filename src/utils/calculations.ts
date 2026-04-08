@@ -4,7 +4,9 @@ export const calculateBidTotals = (bid: Bid): CalculationResults => {
   try {
     let monthlySubtotal = 0;
     let monthlyFixedFees = 0;
-    let monthlyVariableFees = 0;
+    let monthlyPercentageFees = 0;
+    let monthlyPerHaulFees = 0;
+    let monthlyPerTonFees = 0;
     let totalEstimatedHauls = 0;
     let totalEstimatedTons = 0;
 
@@ -29,11 +31,11 @@ export const calculateBidTotals = (bid: Bid): CalculationResults => {
       if (fee.type === 'Fixed') {
         monthlyFixedFees += val;
       } else if (fee.type === 'Percentage') {
-        monthlyVariableFees += (monthlySubtotal * (val / 100));
+        monthlyPercentageFees += (monthlySubtotal * (val / 100));
       } else if (fee.type === 'Per Haul') {
-        monthlyVariableFees += totalEstimatedHauls * val;
+        monthlyPerHaulFees += totalEstimatedHauls * val;
       } else if (fee.type === 'Per Ton') {
-        monthlyVariableFees += totalEstimatedTons * val;
+        monthlyPerTonFees += totalEstimatedTons * val;
       }
     });
 
@@ -44,8 +46,9 @@ export const calculateBidTotals = (bid: Bid): CalculationResults => {
     const fuelSurcharge = monthlySubtotal * (fuelSurchargePercent / 100);
     const environmentalFee = monthlySubtotal * (environmentalFeePercent / 100);
     
-    monthlyVariableFees += fuelSurcharge + environmentalFee;
+    monthlyPercentageFees += fuelSurcharge + environmentalFee;
 
+    const monthlyVariableFees = monthlyPercentageFees + monthlyPerHaulFees + monthlyPerTonFees;
     const monthlyTotal = monthlySubtotal + monthlyFixedFees + monthlyVariableFees;
     
     // Annual total (first 12 months)
@@ -78,6 +81,9 @@ export const calculateBidTotals = (bid: Bid): CalculationResults => {
       breakdown: {
         services: sanitize(monthlySubtotal),
         fixedFees: sanitize(monthlyFixedFees),
+        percentageFees: sanitize(monthlyPercentageFees),
+        perHaulFees: sanitize(monthlyPerHaulFees),
+        perTonFees: sanitize(monthlyPerTonFees),
         variableFees: sanitize(monthlyVariableFees)
       }
     };
@@ -89,7 +95,14 @@ export const calculateBidTotals = (bid: Bid): CalculationResults => {
       monthlyTotal: 0,
       annualTotal: 0,
       contractTermTotal: 0,
-      breakdown: { services: 0, fixedFees: 0, variableFees: 0 }
+      breakdown: { 
+        services: 0, 
+        fixedFees: 0, 
+        percentageFees: 0, 
+        perHaulFees: 0, 
+        perTonFees: 0, 
+        variableFees: 0 
+      }
     };
   }
 };

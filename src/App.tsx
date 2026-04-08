@@ -6,6 +6,8 @@ import {
   TrendingUp, 
   DollarSign, 
   BarChart3, 
+  PieChart as PieChartIcon,
+  Download,
   Settings2, 
   Truck, 
   Info, 
@@ -20,6 +22,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   BarChart, 
   Bar, 
+  PieChart,
+  Pie,
   XAxis, 
   YAxis, 
   CartesianGrid, 
@@ -44,6 +48,13 @@ import { twMerge } from 'tailwind-merge';
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+
+const FEE_TYPE_TOOLTIPS = {
+  'Fixed': 'A flat monthly charge regardless of service volume.',
+  'Percentage': 'Calculated as a percentage of the base service subtotal.',
+  'Per Haul': 'Charged every time a container is emptied.',
+  'Per Ton': 'Charged based on the actual weight of waste collected.'
+};
 
 export default function App() {
   const [bids, setBids] = useState<Bid[]>(INITIAL_BIDS);
@@ -97,6 +108,57 @@ export default function App() {
 
   const updateBid = (updatedBid: Bid) => {
     setBids(bids.map(b => b.id === updatedBid.id ? updatedBid : b));
+  };
+
+  const handleExportCSV = () => {
+    if (!selectedBid) return;
+    
+    const results = calculateBidTotals(selectedBid);
+    const rows = [
+      ['Bid Details', ''],
+      ['Hauler Name', `"${selectedBid.haulerName}"`],
+      ['Contract Term', `"${selectedBid.contractTermMonths} months"`],
+      ['CPI Escalation', `"${selectedBid.cpiEscalationPercent}%"`],
+      ['Fuel Surcharge', `"${selectedBid.fuelSurchargePercent}%"`],
+      ['Environmental Fee', `"${selectedBid.environmentalFeePercent}%"`],
+      [''],
+      ['Summary', ''],
+      ['Monthly Subtotal', results.monthlySubtotal],
+      ['Monthly Fees', results.monthlyFees],
+      ['Monthly Total', results.monthlyTotal],
+      ['Annual Total', results.annualTotal],
+      ['Contract Term Total', results.contractTermTotal],
+      [''],
+      ['Waste Services', ''],
+      ['Stream', 'Container Size', 'Frequency', 'Quantity', 'Base Rate', 'Total'],
+      ...selectedBid.services.map(s => [
+        s.stream, 
+        `"${s.containerSize}"`, 
+        `"${s.frequency}"`, 
+        s.quantity, 
+        s.baseRate, 
+        s.baseRate * s.quantity
+      ]),
+      [''],
+      ['Additional Fees', ''],
+      ['Name', 'Type', 'Value', 'Description'],
+      ...selectedBid.fees.map(f => [
+        `"${f.name}"`, 
+        f.type, 
+        f.value, 
+        `"${f.description || ''}"`
+      ])
+    ];
+
+    const csvContent = rows.map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${selectedBid.haulerName.replace(/\s+/g, '_')}_Bid.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -282,6 +344,13 @@ export default function App() {
                             className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
                           >
                             <Settings2 className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={handleExportCSV}
+                            className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                            title="Export Bid to CSV"
+                          >
+                            <Download className="w-5 h-5" />
                           </button>
                         </div>
                         <div className="text-slate-500 font-medium flex items-center gap-2">
@@ -728,7 +797,12 @@ export default function App() {
                                       "text-sm font-bold",
                                       darkMode ? "text-slate-100" : "text-slate-800"
                                     )}>{fee.name}</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">{fee.type}</p>
+                                    <div className="relative group/tooltip">
+                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider cursor-help">{fee.type}</p>
+                                      <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-20">
+                                        {FEE_TYPE_TOOLTIPS[fee.type]}
+                                      </div>
+                                    </div>
                                   </>
                                 )}
                               </div>
@@ -854,6 +928,98 @@ export default function App() {
                       </div>
                     </section>
                   </div>
+
+                  {/* Fee Breakdown Pie Chart */}
+                  <section className={cn(
+                    "rounded-2xl border shadow-sm p-8 transition-colors",
+                    darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                  )}>
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className={cn(
+                        "text-xl font-bold flex items-center gap-2",
+                        darkMode ? "text-slate-100" : "text-slate-800"
+                      )}>
+                        <PieChartIcon className="w-6 h-6 text-emerald-500" />
+                        Fee Breakdown Analysis
+                      </h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Fixed Fees', value: calculateBidTotals(selectedBid).breakdown.fixedFees },
+                                { name: 'Percentage Fees', value: calculateBidTotals(selectedBid).breakdown.percentageFees },
+                                { name: 'Per Haul Fees', value: calculateBidTotals(selectedBid).breakdown.perHaulFees },
+                                { name: 'Per Ton Fees', value: calculateBidTotals(selectedBid).breakdown.perTonFees },
+                              ].filter(d => d.value > 0)}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {[
+                                '#3b82f6', // blue
+                                '#10b981', // emerald
+                                '#f59e0b', // amber
+                                '#8b5cf6', // violet
+                              ].map((color, index) => (
+                                <Cell key={`cell-${index}`} fill={color} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              formatter={(value: number) => formatCurrency(value)}
+                              contentStyle={{ 
+                                borderRadius: '12px', 
+                                border: 'none', 
+                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff',
+                                color: darkMode ? '#f8fafc' : '#0f172a'
+                              }}
+                            />
+                            <Legend verticalAlign="bottom" height={36}/>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className={cn(
+                          "p-4 rounded-xl border",
+                          darkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
+                        )}>
+                          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Fee Efficiency Score</p>
+                          {(() => {
+                            const results = calculateBidTotals(selectedBid);
+                            const feeRatio = (results.monthlyFees / results.monthlyTotal) * 100;
+                            return (
+                              <div className="flex items-end justify-between">
+                                <div>
+                                  <p className={cn(
+                                    "text-3xl font-black",
+                                    feeRatio > 30 ? "text-red-500" : feeRatio > 15 ? "text-amber-500" : "text-emerald-500"
+                                  )}>
+                                    {100 - Math.round(feeRatio)}%
+                                  </p>
+                                  <p className="text-xs text-slate-400">of total cost is base service</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-bold text-slate-500">{formatCurrency(results.monthlyFees)}</p>
+                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Total Monthly Fees</p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <p className="text-sm text-slate-500 leading-relaxed italic">
+                          This breakdown helps identify hidden costs. High percentage or per-haul fees can significantly impact the total contract value over time as volume increases.
+                        </p>
+                      </div>
+                    </div>
+                  </section>
                 </motion.div>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white rounded-3xl border-2 border-dashed border-slate-200">

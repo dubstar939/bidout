@@ -1,362 +1,1062 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Bid, CalculatedBid, FacilityInfo } from './types';
-import BidForm from './components/BidForm';
-import SavingsMatrix from './components/SavingsMatrix';
-import SavingsSummary from './components/SavingsSummary';
-import Header from './components/Header';
-import BaselineSection from './components/BaselineSection';
-import MarketBidsSection from './components/MarketBidsSection';
-import AIReportSection from './components/AIReportSection';
-import ComparisonView from './components/ComparisonView';
-import ConfirmDialog from './components/ConfirmDialog';
-import { getAIAnalysis } from './services/analysisService';
-import { calculateBidMetrics, currencyFormat } from './services/calculationUtils';
-import { useTheme } from './components/ThemeContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import html2canvas from 'html2canvas';
-import { jsPDF } from 'jspdf';
+import React, { useState, useMemo } from 'react';
+import { 
+  Trash2, 
+  Plus, 
+  TrendingDown, 
+  TrendingUp, 
+  DollarSign, 
+  BarChart3, 
+  PieChart as PieChartIcon,
+  Download,
+  Settings2, 
+  Truck, 
+  Info, 
+  ChevronRight,
+  Calculator,
+  FileText,
+  ArrowRightLeft,
+  Moon,
+  Sun
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  BarChart, 
+  Bar, 
+  PieChart,
+  Pie,
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer,
+  Cell
+} from 'recharts';
+import { 
+  Bid, 
+  WasteService, 
+  Fee, 
+  WASTE_STREAMS, 
+  CONTAINER_SIZES, 
+  FREQUENCIES 
+} from './types';
+import { calculateBidTotals, formatCurrency } from './utils/calculations';
+import { INITIAL_BIDS } from './constants/mockData';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
 
-/**
- * Custom hook to manage audit data persistence and state.
- * Adheres to Single Responsibility Principle.
- */
-const useAuditData = () => {
-  const [bids, setBids] = useState<Bid[]>([]);
-  const [facilityInfo, setFacilityInfo] = useState<FacilityInfo>({
-    facilityName: '',
-    facId: '',
-    address: '',
-    pocNameNumber: ''
-  });
+function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
-  // Load from localStorage on mount
-  useEffect(() => {
-    const savedBids = localStorage.getItem('audit_bids');
-    const savedFacility = localStorage.getItem('audit_facility');
-    if (savedBids) {
-      try { setBids(JSON.parse(savedBids)); } catch (e) { console.error("Failed to parse saved bids"); }
-    }
-    if (savedFacility) {
-      try { setFacilityInfo(JSON.parse(savedFacility)); } catch (e) { console.error("Failed to parse facility info"); }
-    }
-  }, []);
-
-  // Sync to localStorage on changes
-  useEffect(() => {
-    if (bids.length > 0) localStorage.setItem('audit_bids', JSON.stringify(bids));
-    else localStorage.removeItem('audit_bids');
-  }, [bids]);
-
-  useEffect(() => {
-    const hasData = Object.values(facilityInfo).some(val => val !== '');
-    if (hasData) localStorage.setItem('audit_facility', JSON.stringify(facilityInfo));
-    else localStorage.removeItem('audit_facility');
-  }, [facilityInfo]);
-
-  const wipeData = useCallback(() => {
-    setBids([]);
-    setFacilityInfo({ facilityName: '', facId: '', address: '', pocNameNumber: '' });
-    localStorage.removeItem('audit_bids');
-    localStorage.removeItem('audit_facility');
-  }, []);
-
-  return { bids, setBids, facilityInfo, setFacilityInfo, wipeData };
+const FEE_TYPE_TOOLTIPS = {
+  'Fixed': 'A flat monthly charge regardless of service volume.',
+  'Percentage': 'Calculated as a percentage of the base service subtotal.',
+  'Per Haul': 'Charged every time a container is emptied.',
+  'Per Ton': 'Charged based on the actual weight of waste collected.'
 };
 
-const App: React.FC = () => {
-  const { isDark } = useTheme();
-  const { bids, setBids, facilityInfo, setFacilityInfo, wipeData } = useAuditData();
-  
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [editingBid, setEditingBid] = useState<Bid | null>(null);
-  const [aiAnalysis, setAiAnalysis] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [aiAnalysisType, setAiAnalysisType] = useState<'full' | 'slim'>('full');
-  const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, message: string, onConfirm: () => void} | null>(null);
-  
-  const [bidFilter, setBidFilter] = useState<string>('all');
-  const [bidSort, setBidSort] = useState<'asc' | 'desc'>('asc');
-  const [isComparisonView, setIsComparisonView] = useState(false);
+export default function App() {
+  const [bids, setBids] = useState<Bid[]>(INITIAL_BIDS);
+  const [selectedBidId, setSelectedBidId] = useState<string | null>(INITIAL_BIDS[0].id);
+  const [isEditing, setIsEditing] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
-  const reportRef = useRef<HTMLDivElement>(null);
+  const selectedBid = useMemo(() => 
+    bids.find(b => b.id === selectedBidId) || null
+  , [bids, selectedBidId]);
 
-  const calculatedBids = useMemo(() => calculateBidMetrics(bids), [bids]);
-  const currentService = useMemo(() => calculatedBids.find(b => b.isCurrent), [calculatedBids]);
-  
-  const prospectiveBids = useMemo(() => {
-    let filtered = calculatedBids.filter(b => !b.isCurrent);
-    
-    if (bidFilter === 'award') {
-      filtered = filtered.filter(b => b.status?.selected);
-    } else if (bidFilter === 'peak') {
-      filtered = filtered.filter(b => b.isBestValue && !b.status?.selected);
-    }
-    
-    return filtered.sort((a, b) => {
-      return bidSort === 'asc' 
-        ? a.totalContract - b.totalContract 
-        : b.totalContract - a.totalContract;
-    });
-  }, [calculatedBids, bidFilter, bidSort]);
+  const bidResults = useMemo(() => 
+    bids.map(bid => ({
+      bid,
+      results: calculateBidTotals(bid)
+    }))
+  , [bids]);
 
-  const handleSaveBid = useCallback((newBid: Bid) => {
-    setBids(prev => {
-      const filtered = prev.filter(b => b.id !== newBid.id);
-      if (newBid.isCurrent) {
-        return [...filtered.map(b => ({ ...b, isCurrent: false })), newBid];
-      }
-      return [...filtered, newBid];
-    });
-    setIsFormOpen(false);
-    setEditingBid(null);
-  }, [setBids]);
+  const chartData = useMemo(() => 
+    bidResults.map(({ bid, results }) => ({
+      name: bid.haulerName,
+      'Monthly Total': results.monthlyTotal,
+      'Annual Total': results.annualTotal / 12, // For scaling
+      'Contract Total': results.contractTermTotal / bid.contractTermMonths // For scaling
+    }))
+  , [bidResults]);
 
-  const handleEditBid = useCallback((bid: Bid) => {
-    const { 
-      servicesMonthly, recurringFeesMonthly, oneTimeFees, contingentFees,
-      totalMonthlyOpEx, totalAnnualOpEx, totalContract, isBestValue, termRecurringTotal,
-      ...originalBid 
-    } = bid as any;
-    setEditingBid(originalBid as Bid);
-    setIsFormOpen(true);
-  }, []);
+  const handleAddBid = () => {
+    const newBid: Bid = {
+      id: `bid-${Date.now()}`,
+      haulerName: 'New Hauler',
+      contractTermMonths: 36,
+      cpiEscalationPercent: 3,
+      fuelSurchargePercent: 10,
+      environmentalFeePercent: 5,
+      services: [],
+      fees: []
+    };
+    setBids([...bids, newBid]);
+    setSelectedBidId(newBid.id);
+    setIsEditing(true);
+  };
 
-  const handleDeleteBid = useCallback((id: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      message: 'Delete this specific worksheet from the audit session?',
-      onConfirm: () => {
-        setBids(prev => prev.filter(b => String(b.id) !== String(id)));
-        setConfirmDialog(null);
-      }
-    });
-  }, [setBids]);
-
-  const handleWipeSession = useCallback(() => {
-    setConfirmDialog({
-      isOpen: true,
-      message: 'CRITICAL ACTION: This will erase all facility identity data and ALL current/prospective bid worksheets. This cannot be undone. Proceed?',
-      onConfirm: () => {
-        wipeData();
-        setAiAnalysis('');
-        setIsFormOpen(false);
-        setEditingBid(null);
-        setConfirmDialog(null);
-      }
-    });
-  }, [wipeData]);
-
-  const runAnalysis = async () => {
-    if (calculatedBids.length < 2) return;
-    
-    setIsAnalyzing(true);
-    const currentBids = [...calculatedBids]; // Snapshot to avoid race conditions
-    
-    try {
-      const analysis = await getAIAnalysis(currentBids, aiAnalysisType);
-      setAiAnalysis(analysis);
-    } catch (error: any) {
-      console.error("Analysis failed:", error);
-      setAiAnalysis(`Analysis failed: ${error.message || 'Unknown error'}`);
-    } finally {
-      setIsAnalyzing(false);
+  const handleDeleteBid = (id: string) => {
+    const newBids = bids.filter(b => b.id !== id);
+    setBids(newBids);
+    if (selectedBidId === id) {
+      setSelectedBidId(newBids[0]?.id || null);
     }
   };
 
-  const handleExportPDF = async () => {
-    if (!reportRef.current) return;
+  const updateBid = (updatedBid: Bid) => {
+    setBids(bids.map(b => b.id === updatedBid.id ? updatedBid : b));
+  };
+
+  const handleExportCSV = () => {
+    if (!selectedBid) return;
     
-    setIsExporting(true);
-    try {
-      const element = reportRef.current;
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: isDark ? '#020617' : '#ffffff',
-        ignoreElements: (el) => el.classList.contains('no-print')
-      });
-      
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      const imgWidth = canvas.width;
-      const imgHeight = canvas.height;
-      const ratio = Math.min(pdfWidth / imgWidth, pdfHeight / imgHeight);
-      const imgX = (pdfWidth - imgWidth * ratio) / 2;
-      const imgY = 0;
-      
-      pdf.addImage(imgData, 'PNG', imgX, imgY, imgWidth * ratio, imgHeight * ratio);
-      const filename = `WasteAudit_${facilityInfo.facilityName || 'Report'}_${new Date().toISOString().split('T')[0]}.pdf`;
-      pdf.save(filename);
-    } catch (error) {
-      console.error("PDF Export failed:", error);
-      window.print();
-    } finally {
-      setIsExporting(false);
-    }
+    const results = calculateBidTotals(selectedBid);
+    const rows = [
+      ['Bid Details', ''],
+      ['Hauler Name', `"${selectedBid.haulerName}"`],
+      ['Contract Term', `"${selectedBid.contractTermMonths} months"`],
+      ['CPI Escalation', `"${selectedBid.cpiEscalationPercent}%"`],
+      ['Fuel Surcharge', `"${selectedBid.fuelSurchargePercent}%"`],
+      ['Environmental Fee', `"${selectedBid.environmentalFeePercent}%"`],
+      [''],
+      ['Summary', ''],
+      ['Monthly Subtotal', results.monthlySubtotal],
+      ['Monthly Fees', results.monthlyFees],
+      ['Monthly Total', results.monthlyTotal],
+      ['Annual Total', results.annualTotal],
+      ['Contract Term Total', results.contractTermTotal],
+      [''],
+      ['Waste Services', ''],
+      ['Stream', 'Container Size', 'Frequency', 'Quantity', 'Base Rate', 'Total'],
+      ...selectedBid.services.map(s => [
+        s.stream, 
+        `"${s.containerSize}"`, 
+        `"${s.frequency}"`, 
+        s.quantity, 
+        s.baseRate, 
+        s.baseRate * s.quantity
+      ]),
+      [''],
+      ['Additional Fees', ''],
+      ['Name', 'Type', 'Value', 'Description'],
+      ...selectedBid.fees.map(f => [
+        `"${f.name}"`, 
+        f.type, 
+        f.value, 
+        `"${f.description || ''}"`
+      ])
+    ];
+
+    const csvContent = rows.map(e => e.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `${selectedBid.haulerName.replace(/\s+/g, '_')}_Bid.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
-    <div className={`min-h-screen flex flex-col transition-colors duration-300 ${isDark ? 'bg-[#020617] text-slate-100' : 'bg-[#f8fafc] text-slate-800'}`} ref={reportRef} lang="en">
-      <Header 
-        facilityInfo={facilityInfo}
-        setFacilityInfo={setFacilityInfo}
-        onNewAudit={() => { setEditingBid(null); setIsFormOpen(true); }}
-        onExport={handleExportPDF}
-        onWipe={handleWipeSession}
-        isExporting={isExporting}
-        hasBids={calculatedBids.length > 0}
-        isFormOpen={isFormOpen}
-      />
-
-      <main className="flex-grow container mx-auto px-4 py-12 max-w-6xl">
-        {isFormOpen ? (
-          <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 no-print" data-html2canvas-ignore="true">
-            <BidForm 
-              onSave={handleSaveBid} 
-              onCancel={() => { setIsFormOpen(false); setEditingBid(null); }}
-              onConfirmRequest={(message, onConfirm) => setConfirmDialog({ isOpen: true, message, onConfirm })}
-              initialData={editingBid}
-            />
-          </div>
-        ) : bids.length === 0 ? (
-          <div className="space-y-12">
-            <div className={`p-12 rounded-lg border-2 border-dashed text-center space-y-8 transition-colors ${isDark ? 'bg-slate-900/40 border-teal-500/20' : 'bg-white border-slate-200'}`}>
-              <div className="max-w-2xl mx-auto space-y-6">
-                <h2 className={`text-2xl font-black uppercase tracking-widest ${isDark ? 'text-white' : 'text-slate-900'}`}>
-                  Waste Savings Calculator
-                </h2>
-                <p className={`text-sm leading-relaxed ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                  Compare your current waste hauling costs against market bids to identify hidden surcharges and projected savings. 
-                </p>
-                <button 
-                  onClick={() => { setEditingBid(null); setIsFormOpen(true); }}
-                  className={`mt-12 py-4 px-12 rounded font-black uppercase tracking-[0.4em] text-[11px] transition-all shadow-xl active:scale-95 ${isDark ? 'bg-[#2dd4bf] text-slate-950 hover:bg-[#0d9488] hover:text-white' : 'bg-[#0d9488] text-white hover:bg-teal-700'}`}
-                >
-                  Start Baseline Audit
-                </button>
-              </div>
+    <div className={cn(
+      "min-h-screen font-sans transition-colors duration-300",
+      darkMode ? "bg-slate-950 text-slate-100" : "bg-slate-50 text-slate-900"
+    )}>
+      {/* Header */}
+      <header className={cn(
+        "border-b sticky top-0 z-10 transition-colors",
+        darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+      )}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-blue-600 p-2 rounded-lg">
+              <Truck className="w-6 h-6 text-white" />
             </div>
+            <h1 className={cn(
+              "text-xl font-bold tracking-tight",
+              darkMode ? "text-white" : "text-slate-900"
+            )}>Bidout Master</h1>
           </div>
-        ) : (
-          <div className="space-y-12">
-            <BaselineSection 
-              currentService={currentService}
-              onEdit={handleEditBid}
-              onDelete={handleDeleteBid}
-              onAddBaseline={() => { setEditingBid({ isCurrent: true } as any); setIsFormOpen(true); }}
-            />
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setDarkMode(!darkMode)}
+              className={cn(
+                "p-2 rounded-lg transition-colors",
+                darkMode ? "bg-slate-800 text-yellow-400 hover:bg-slate-700" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              )}
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
+            <button 
+              onClick={handleAddBid}
+              className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              New Bid
+            </button>
+          </div>
+        </div>
+      </header>
 
-            <SavingsSummary bids={calculatedBids} />
-
-            {calculatedBids.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <section className={`p-8 rounded border shadow-2xl backdrop-blur-md transition-colors ${isDark ? 'bg-[#1e293b]/40 border-teal-500/10' : 'bg-white border-slate-200'}`}>
-                  <h2 className="text-xs font-black text-slate-500 mb-10 uppercase tracking-[0.4em] flex items-center gap-3">
-                    <span className={`w-8 h-[1px] ${isDark ? 'bg-teal-500/50' : 'bg-slate-300'}`}></span>
-                    Market Analysis: Comparative Monthly OpEx
-                  </h2>
-                  <div className="h-72 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={calculatedBids} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#1e293b" : "#f1f5f9"} />
-                        <XAxis dataKey="haulerName" axisLine={false} tickLine={false} tick={{fill: isDark ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: '800'}} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: isDark ? '#94a3b8' : '#64748b', fontSize: 10}} tickFormatter={(val) => `$${val}`} />
-                        <Tooltip 
-                          contentStyle={{backgroundColor: isDark ? '#0f172a' : '#ffffff', borderRadius: '4px', border: `1px solid ${isDark ? '#2dd4bf' : '#cbd5e1'}`, fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', color: isDark ? '#f1f5f9' : '#1e293b'}}
-                          itemStyle={{color: isDark ? '#2dd4bf' : '#0d9488'}}
-                          cursor={{fill: isDark ? '#2dd4bf' : '#0d9488', opacity: 0.05}}
-                          formatter={(value: number) => [currencyFormat.format(value), '']} 
-                        />
-                        <Legend verticalAlign="top" align="right" iconType="rect" wrapperStyle={{paddingBottom: '30px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.15em', color: isDark ? '#94a3b8' : '#64748b'}} />
-                        <Bar dataKey="servicesMonthly" name="Base Rate" stackId="a" fill={isDark ? "#0d9488" : "#0f766e"} />
-                        <Bar dataKey="recurringFeesMonthly" name="Surcharges" stackId="a" fill={isDark ? "#2dd4bf" : "#2dd4bf"} radius={[2, 2, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
-
-                <section className={`p-8 rounded border shadow-2xl backdrop-blur-md transition-colors ${isDark ? 'bg-[#1e293b]/40 border-teal-500/10' : 'bg-white border-slate-200'}`}>
-                  <h2 className="text-xs font-black text-slate-500 mb-10 uppercase tracking-[0.4em] flex items-center gap-3">
-                    <span className={`w-8 h-[1px] ${isDark ? 'bg-teal-500/50' : 'bg-slate-300'}`}></span>
-                    Strategic Analysis: Total Lifecycle Commitment
-                  </h2>
-                  <div className="h-72 w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={calculatedBids} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#1e293b" : "#f1f5f9"} />
-                        <XAxis dataKey="haulerName" axisLine={false} tickLine={false} tick={{fill: isDark ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: '800'}} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: isDark ? '#94a3b8' : '#64748b', fontSize: 10}} tickFormatter={(val) => `$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} />
-                        <Tooltip 
-                          contentStyle={{backgroundColor: isDark ? '#0f172a' : '#ffffff', borderRadius: '4px', border: `1px solid ${isDark ? '#2dd4bf' : '#cbd5e1'}`, fontSize: '11px', textTransform: 'uppercase', fontWeight: 'bold', color: isDark ? '#f1f5f9' : '#1e293b'}}
-                          itemStyle={{color: isDark ? '#2dd4bf' : '#0d9488'}}
-                          cursor={{fill: isDark ? '#2dd4bf' : '#0d9488', opacity: 0.05}}
-                          formatter={(value: number) => [currencyFormat.format(value), '']} 
-                        />
-                        <Legend verticalAlign="top" align="right" iconType="rect" wrapperStyle={{paddingBottom: '30px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.15em', color: isDark ? '#94a3b8' : '#64748b'}} />
-                        <Bar dataKey="termRecurringTotal" name="Cumulative OpEx" stackId="a" fill={isDark ? "#1e293b" : "#e2e8f0"} stroke={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={1} />
-                        <Bar dataKey="oneTimeFees" name="Fixed Entry" stackId="a" fill={isDark ? "#2dd4bf" : "#2dd4bf"} radius={[2, 2, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </section>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Sidebar: Bid List */}
+          <div className="lg:col-span-4 space-y-6">
+            <section>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">Active Bids</h2>
+                <span className="text-xs font-medium bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">{bids.length}</span>
               </div>
-            )}
+                      <div className="space-y-3">
+                {bids.map(bid => {
+                  const results = calculateBidTotals(bid);
+                  const isSelected = selectedBidId === bid.id;
+                  
+                  return (
+                    <motion.div
+                      key={bid.id}
+                      layout
+                      onClick={() => setSelectedBidId(bid.id)}
+                      className={cn(
+                        "p-4 rounded-xl border cursor-pointer transition-all group relative",
+                        isSelected 
+                          ? (darkMode ? "bg-slate-800 border-blue-500 shadow-lg ring-1 ring-blue-500" : "bg-white border-blue-500 shadow-md ring-1 ring-blue-500")
+                          : (darkMode ? "bg-slate-900 border-slate-800 hover:border-slate-700" : "bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm")
+                      )}
+                    >
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className={cn(
+                          "font-bold truncate pr-8",
+                          darkMode ? "text-slate-100" : "text-slate-800"
+                        )}>{bid.haulerName}</h3>
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); handleDeleteBid(bid.id); }}
+                          className="text-slate-400 hover:text-red-500 p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="flex items-end justify-between">
+                        <div>
+                          <p className="text-xs text-slate-500 font-medium">Monthly Total</p>
+                          <p className={cn(
+                            "text-lg font-black",
+                            darkMode ? "text-white" : "text-slate-900"
+                          )}>{formatCurrency(results.monthlyTotal)}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs text-slate-500 font-medium">Term Total</p>
+                          <p className={cn(
+                            "text-sm font-bold",
+                            darkMode ? "text-slate-300" : "text-slate-700"
+                          )}>{formatCurrency(results.contractTermTotal)}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </section>
 
-            <MarketBidsSection 
-              prospectiveBids={prospectiveBids}
-              onEdit={handleEditBid}
-              onDelete={handleDeleteBid}
-              bidFilter={bidFilter}
-              setBidFilter={setBidFilter}
-              bidSort={bidSort}
-              setBidSort={setBidSort}
-              isComparisonView={isComparisonView}
-              setIsComparisonView={setIsComparisonView}
-            />
+            {/* Comparison Summary */}
+            <section className="bg-slate-900 text-white p-6 rounded-2xl shadow-xl overflow-hidden relative">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <TrendingDown className="w-24 h-24" />
+              </div>
+              <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+                <BarChart3 className="w-5 h-5 text-blue-400" />
+                Savings Analysis
+              </h2>
+              {bids.length > 1 ? (
+                <div className="space-y-4">
+                  {(() => {
+                    const sorted = [...bidResults].sort((a, b) => a.results.monthlyTotal - b.results.monthlyTotal);
+                    const best = sorted[0];
+                    const worst = sorted[sorted.length - 1];
+                    const monthlySavings = worst.results.monthlyTotal - best.results.monthlyTotal;
+                    const termSavings = worst.results.contractTermTotal - best.results.contractTermTotal;
 
-            {isComparisonView && (
-              <ComparisonView 
-                selectedBids={prospectiveBids.filter(b => b.status?.selected)}
-                currentService={currentService}
-                onClose={() => setIsComparisonView(false)}
-              />
-            )}
-
-            {calculatedBids.length > 1 && (
-              <section className={`space-y-8 pt-8 border-t ${isDark ? 'border-slate-800' : 'border-slate-200'}`}>
-                 <SavingsMatrix bids={calculatedBids} />
-                 <AIReportSection 
-                    aiAnalysis={aiAnalysis}
-                    isAnalyzing={isAnalyzing}
-                    aiAnalysisType={aiAnalysisType}
-                    setAiAnalysisType={setAiAnalysisType}
-                    onRunAnalysis={runAnalysis}
-                 />
-              </section>
-            )}
+                    return (
+                      <>
+                        <div className="p-4 bg-white/10 rounded-xl border border-white/10">
+                          <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Potential Monthly Savings</p>
+                          <p className="text-2xl font-black text-emerald-400">{formatCurrency(monthlySavings)}</p>
+                        </div>
+                        <div className="p-4 bg-white/10 rounded-xl border border-white/10">
+                          <p className="text-xs text-slate-400 uppercase font-bold tracking-wider mb-1">Total Contract Savings</p>
+                          <p className="text-2xl font-black text-blue-400">{formatCurrency(termSavings)}</p>
+                        </div>
+                        <p className="text-xs text-slate-500 italic">
+                          Comparing {best.bid.haulerName} vs {worst.bid.haulerName}
+                        </p>
+                      </>
+                    );
+                  })()}
+                </div>
+              ) : (
+                <p className="text-slate-400 text-sm">Add at least two bids to see savings comparisons.</p>
+              )}
+            </section>
           </div>
-        )}
+
+          {/* Main Content: Bid Details */}
+          <div className="lg:col-span-8">
+            <AnimatePresence mode="wait">
+              {selectedBid ? (
+                <motion.div
+                  key={selectedBid.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="space-y-8"
+                >
+                  {/* Bid Header Card */}
+                  <div className={cn(
+                    "p-8 rounded-2xl border shadow-sm transition-colors",
+                    darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                  )}>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-3">
+                          <h2 className={cn(
+                            "text-3xl font-black tracking-tight",
+                            darkMode ? "text-white" : "text-slate-900"
+                          )}>
+                            {isEditing ? (
+                              <input 
+                                type="text" 
+                                value={selectedBid.haulerName}
+                                onChange={(e) => updateBid({ ...selectedBid, haulerName: e.target.value })}
+                                className={cn(
+                                  "border-none focus:ring-2 focus:ring-blue-500 rounded px-2 -ml-2",
+                                  darkMode ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+                                )}
+                              />
+                            ) : selectedBid.haulerName}
+                          </h2>
+                          <button 
+                            onClick={() => setIsEditing(!isEditing)}
+                            className="p-2 text-slate-400 hover:text-blue-600 transition-colors"
+                          >
+                            <Settings2 className="w-5 h-5" />
+                          </button>
+                          <button 
+                            onClick={handleExportCSV}
+                            className="p-2 text-slate-400 hover:text-emerald-600 transition-colors"
+                            title="Export Bid to CSV"
+                          >
+                            <Download className="w-5 h-5" />
+                          </button>
+                        </div>
+                        <div className="text-slate-500 font-medium flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          {isEditing ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <input 
+                                type="number" 
+                                min="0"
+                                value={selectedBid.contractTermMonths}
+                                onChange={(e) => updateBid({ ...selectedBid, contractTermMonths: parseInt(e.target.value) || 0 })}
+                                className={cn(
+                                  "w-16 border-none rounded px-1 py-0.5 text-sm",
+                                  darkMode ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+                                )}
+                              />
+                              <span>Month Contract •</span>
+                              <input 
+                                type="number" 
+                                min="0"
+                                step="0.1"
+                                value={selectedBid.cpiEscalationPercent}
+                                onChange={(e) => updateBid({ ...selectedBid, cpiEscalationPercent: parseFloat(e.target.value) || 0 })}
+                                className={cn(
+                                  "w-16 border-none rounded px-1 py-0.5 text-sm",
+                                  darkMode ? "bg-slate-800 text-white" : "bg-slate-50 text-slate-900"
+                                )}
+                              />
+                              <span>% Annual Escalation</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm">
+                              {selectedBid.contractTermMonths} Month Contract • {selectedBid.cpiEscalationPercent}% Annual Escalation
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Monthly Total</p>
+                        <p className="text-4xl font-black text-blue-600">
+                          {formatCurrency(calculateBidTotals(selectedBid).monthlyTotal)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Quick Stats */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {[
+                        { 
+                          label: 'Base Services', 
+                          value: formatCurrency(calculateBidTotals(selectedBid).breakdown.services), 
+                          icon: Truck 
+                        },
+                        { 
+                          label: 'Total Fees', 
+                          value: formatCurrency(calculateBidTotals(selectedBid).monthlyFees), 
+                          icon: DollarSign 
+                        },
+                        { 
+                          label: 'Fuel Surcharge', 
+                          value: isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <input 
+                                type="number" 
+                                min="0"
+                                step="0.1"
+                                value={selectedBid.fuelSurchargePercent}
+                                onChange={(e) => updateBid({ ...selectedBid, fuelSurchargePercent: parseFloat(e.target.value) || 0 })}
+                                className={cn(
+                                  "w-12 border-none rounded px-1 py-0.5 text-xs font-black",
+                                  darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                )}
+                              />
+                              <span>%</span>
+                            </div>
+                          ) : `${selectedBid.fuelSurchargePercent}%`, 
+                          icon: Calculator 
+                        },
+                        { 
+                          label: 'Environmental', 
+                          value: isEditing ? (
+                            <div className="flex items-center gap-1">
+                              <input 
+                                type="number" 
+                                min="0"
+                                step="0.1"
+                                value={selectedBid.environmentalFeePercent}
+                                onChange={(e) => updateBid({ ...selectedBid, environmentalFeePercent: parseFloat(e.target.value) || 0 })}
+                                className={cn(
+                                  "w-12 border-none rounded px-1 py-0.5 text-xs font-black",
+                                  darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                )}
+                              />
+                              <span>%</span>
+                            </div>
+                          ) : `${selectedBid.environmentalFeePercent}%`, 
+                          icon: Info 
+                        },
+                      ].map((stat, i) => (
+                        <div key={i} className={cn(
+                          "p-4 rounded-xl border transition-colors",
+                          darkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100"
+                        )}>
+                          <div className="flex items-center gap-2 text-slate-400 mb-1">
+                            <stat.icon className="w-3.5 h-3.5" />
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{stat.label}</span>
+                          </div>
+                          <div className={cn(
+                            "text-sm font-black",
+                            darkMode ? "text-slate-100" : "text-slate-800"
+                          )}>{stat.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Services Section */}
+                  <section className={cn(
+                    "rounded-2xl border shadow-sm overflow-hidden transition-colors",
+                    darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                  )}>
+                    <div className={cn(
+                      "p-6 border-b flex items-center justify-between",
+                      darkMode ? "bg-slate-800/50 border-slate-800" : "bg-slate-50/50 border-slate-100"
+                    )}>
+                      <h3 className={cn(
+                        "font-bold flex items-center gap-2",
+                        darkMode ? "text-slate-100" : "text-slate-800"
+                      )}>
+                        <Truck className="w-5 h-5 text-blue-500" />
+                        Waste Services
+                      </h3>
+                      <button 
+                        onClick={() => {
+                          const newService: WasteService = {
+                            id: `s-${Date.now()}`,
+                            stream: 'MSW',
+                            containerSize: '8yd',
+                            frequency: '1xw',
+                            quantity: 1,
+                            baseRate: 0,
+                            estimatedHaulsPerMonth: 0,
+                            estimatedTonsPerMonth: 0
+                          };
+                          updateBid({ ...selectedBid, services: [...selectedBid.services, newService] });
+                        }}
+                        className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" /> Add Service
+                      </button>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className={cn(
+                            "text-[10px] font-bold uppercase tracking-widest border-b",
+                            darkMode ? "text-slate-500 border-slate-800" : "text-slate-400 border-slate-100"
+                          )}>
+                            <th className="px-6 py-4">Stream</th>
+                            <th className="px-6 py-4">Container</th>
+                            <th className="px-6 py-4">Frequency</th>
+                            <th className="px-6 py-4">Qty</th>
+                            {isEditing && (
+                              <>
+                                <th className="px-6 py-4">Est. Hauls/mo</th>
+                                <th className="px-6 py-4">Est. Tons/mo</th>
+                              </>
+                            )}
+                            <th className="px-6 py-4">Rate</th>
+                            <th className="px-6 py-4 text-right">Total</th>
+                            <th className="px-6 py-4"></th>
+                          </tr>
+                        </thead>
+                        <tbody className={cn(
+                          "divide-y",
+                          darkMode ? "divide-slate-800" : "divide-slate-50"
+                        )}>
+                          {selectedBid.services.map(service => (
+                            <tr key={service.id} className={cn(
+                              "group transition-colors",
+                              darkMode ? "hover:bg-slate-800/30" : "hover:bg-slate-50/50"
+                            )}>
+                              <td className="px-6 py-4">
+                                {isEditing ? (
+                                  <select 
+                                    value={service.stream}
+                                    onChange={(e) => {
+                                      const newServices = selectedBid.services.map(s => 
+                                        s.id === service.id ? { ...s, stream: e.target.value as any } : s
+                                      );
+                                      updateBid({ ...selectedBid, services: newServices });
+                                    }}
+                                    className={cn(
+                                      "border-none rounded px-2 py-1 text-[10px] font-black",
+                                      darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                    )}
+                                  >
+                                    {WASTE_STREAMS.map(ws => <option key={ws} value={ws}>{ws}</option>)}
+                                  </select>
+                                ) : (
+                                  <span className={cn(
+                                    "px-2 py-1 rounded text-[10px] font-black",
+                                    service.stream === 'MSW' ? (darkMode ? "bg-slate-800 text-slate-300" : "bg-slate-100 text-slate-600") :
+                                    service.stream === 'REC' ? (darkMode ? "bg-emerald-900/30 text-emerald-400" : "bg-emerald-100 text-emerald-700") :
+                                    (darkMode ? "bg-blue-900/30 text-blue-400" : "bg-blue-100 text-blue-700")
+                                  )}>
+                                    {service.stream}
+                                  </span>
+                                )}
+                              </td>
+                              <td className={cn(
+                                "px-6 py-4 text-sm font-medium",
+                                darkMode ? "text-slate-300" : "text-slate-700"
+                              )}>
+                                {isEditing ? (
+                                  <select 
+                                    value={service.containerSize}
+                                    onChange={(e) => {
+                                      const newServices = selectedBid.services.map(s => 
+                                        s.id === service.id ? { ...s, containerSize: e.target.value } : s
+                                      );
+                                      updateBid({ ...selectedBid, services: newServices });
+                                    }}
+                                    className={cn(
+                                      "border-none rounded px-2 py-1 text-sm",
+                                      darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                    )}
+                                  >
+                                    {CONTAINER_SIZES.map(cs => <option key={cs.id} value={cs.size}>{cs.size}</option>)}
+                                  </select>
+                                ) : service.containerSize}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-slate-500">
+                                {isEditing ? (
+                                  <select 
+                                    value={service.frequency}
+                                    onChange={(e) => {
+                                      const newServices = selectedBid.services.map(s => 
+                                        s.id === service.id ? { ...s, frequency: e.target.value } : s
+                                      );
+                                      updateBid({ ...selectedBid, services: newServices });
+                                    }}
+                                    className={cn(
+                                      "border-none rounded px-2 py-1 text-sm",
+                                      darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                    )}
+                                  >
+                                    {FREQUENCIES.map(f => <option key={f.id} value={f.label}>{f.label}</option>)}
+                                  </select>
+                                ) : service.frequency}
+                              </td>
+                              <td className="px-6 py-4 text-sm text-slate-500">
+                                {isEditing ? (
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    value={service.quantity}
+                                    onChange={(e) => {
+                                      const newServices = selectedBid.services.map(s => 
+                                        s.id === service.id ? { ...s, quantity: parseInt(e.target.value) || 0 } : s
+                                      );
+                                      updateBid({ ...selectedBid, services: newServices });
+                                    }}
+                                    className={cn(
+                                      "w-12 border-none rounded px-2 py-1 text-sm",
+                                      darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                    )}
+                                  />
+                                ) : service.quantity}
+                              </td>
+                              {isEditing && (
+                                <>
+                                  <td className="px-6 py-4 text-sm text-slate-500">
+                                    <input 
+                                      type="number" 
+                                      min="0"
+                                      step="0.1"
+                                      value={service.estimatedHaulsPerMonth || 0}
+                                      onChange={(e) => {
+                                        const newServices = selectedBid.services.map(s => 
+                                          s.id === service.id ? { ...s, estimatedHaulsPerMonth: parseFloat(e.target.value) || 0 } : s
+                                        );
+                                        updateBid({ ...selectedBid, services: newServices });
+                                      }}
+                                      className={cn(
+                                        "w-16 border-none rounded px-2 py-1 text-sm",
+                                        darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                      )}
+                                    />
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-slate-500">
+                                    <input 
+                                      type="number" 
+                                      min="0"
+                                      step="0.1"
+                                      value={service.estimatedTonsPerMonth || 0}
+                                      onChange={(e) => {
+                                        const newServices = selectedBid.services.map(s => 
+                                          s.id === service.id ? { ...s, estimatedTonsPerMonth: parseFloat(e.target.value) || 0 } : s
+                                        );
+                                        updateBid({ ...selectedBid, services: newServices });
+                                      }}
+                                      className={cn(
+                                        "w-16 border-none rounded px-2 py-1 text-sm",
+                                        darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                      )}
+                                    />
+                                  </td>
+                                </>
+                              )}
+                              <td className={cn(
+                                "px-6 py-4 text-sm font-bold",
+                                darkMode ? "text-white" : "text-slate-900"
+                              )}>
+                                {isEditing ? (
+                                  <input 
+                                    type="number" 
+                                    min="0"
+                                    step="0.01"
+                                    value={service.baseRate}
+                                    onChange={(e) => {
+                                      const newServices = selectedBid.services.map(s => 
+                                        s.id === service.id ? { ...s, baseRate: parseFloat(e.target.value) || 0 } : s
+                                      );
+                                      updateBid({ ...selectedBid, services: newServices });
+                                    }}
+                                    className={cn(
+                                      "w-20 border-none rounded px-2 py-1 text-sm",
+                                      darkMode ? "bg-slate-800 text-white" : "bg-slate-100 text-slate-900"
+                                    )}
+                                  />
+                                ) : formatCurrency(service.baseRate)}
+                              </td>
+                              <td className={cn(
+                                "px-6 py-4 text-sm font-black text-right",
+                                darkMode ? "text-white" : "text-slate-900"
+                              )}>
+                                {formatCurrency(service.baseRate * service.quantity)}
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <button 
+                                  onClick={() => {
+                                    const newServices = selectedBid.services.filter(s => s.id !== service.id);
+                                    updateBid({ ...selectedBid, services: newServices });
+                                  }}
+                                  className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                          {selectedBid.services.length === 0 && (
+                            <tr>
+                              <td colSpan={isEditing ? 9 : 7} className="px-6 py-12 text-center text-slate-400 italic text-sm">
+                                No services added yet. Click "Add Service" to begin.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+
+                  {/* Fees Section */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <section className={cn(
+                      "rounded-2xl border shadow-sm overflow-hidden transition-colors",
+                      darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                    )}>
+                      <div className={cn(
+                        "p-6 border-b flex items-center justify-between",
+                        darkMode ? "bg-slate-800/50 border-slate-800" : "bg-slate-50/50 border-slate-100"
+                      )}>
+                        <h3 className={cn(
+                          "font-bold flex items-center gap-2",
+                          darkMode ? "text-slate-100" : "text-slate-800"
+                        )}>
+                          <DollarSign className="w-5 h-5 text-emerald-500" />
+                          Additional Fees
+                        </h3>
+                        <button 
+                          onClick={() => {
+                            const newFee: Fee = {
+                              id: `f-${Date.now()}`,
+                              name: 'New Fee',
+                              type: 'Fixed',
+                              value: 0,
+                              description: ''
+                            };
+                            updateBid({ ...selectedBid, fees: [...selectedBid.fees, newFee] });
+                          }}
+                          className="text-xs font-bold text-blue-600 hover:text-blue-700 flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" /> Add Fee
+                        </button>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {selectedBid.fees.map(fee => (
+                          <div key={fee.id} className={cn(
+                            "flex flex-col p-3 rounded-xl border group transition-colors",
+                            darkMode ? "bg-slate-800 border-slate-700" : "bg-slate-50 border-slate-100"
+                          )}>
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="space-y-0.5">
+                                {isEditing ? (
+                                  <div className="flex flex-col gap-1">
+                                    <input 
+                                      type="text" 
+                                      value={fee.name}
+                                      onChange={(e) => {
+                                        const newFees = selectedBid.fees.map(f => 
+                                          f.id === fee.id ? { ...f, name: e.target.value } : f
+                                        );
+                                        updateBid({ ...selectedBid, fees: newFees });
+                                      }}
+                                      className={cn(
+                                        "border-none rounded px-2 py-0.5 text-sm font-bold",
+                                        darkMode ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-900"
+                                      )}
+                                    />
+                                    <select 
+                                      value={fee.type}
+                                      onChange={(e) => {
+                                        const newFees = selectedBid.fees.map(f => 
+                                          f.id === fee.id ? { ...f, type: e.target.value as any } : f
+                                        );
+                                        updateBid({ ...selectedBid, fees: newFees });
+                                      }}
+                                      className={cn(
+                                        "border-none rounded px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider",
+                                        darkMode ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-900"
+                                      )}
+                                    >
+                                      <option value="Fixed">Fixed</option>
+                                      <option value="Percentage">Percentage</option>
+                                      <option value="Per Haul">Per Haul</option>
+                                      <option value="Per Ton">Per Ton</option>
+                                    </select>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <p className={cn(
+                                      "text-sm font-bold",
+                                      darkMode ? "text-slate-100" : "text-slate-800"
+                                    )}>{fee.name}</p>
+                                    <div className="relative group/tooltip">
+                                      <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider cursor-help">{fee.type}</p>
+                                      <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-slate-800 text-white text-[10px] rounded shadow-xl opacity-0 group-hover/tooltip:opacity-100 transition-opacity pointer-events-none z-20">
+                                        {FEE_TYPE_TOOLTIPS[fee.type]}
+                                      </div>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className={cn(
+                                  "text-sm font-black",
+                                  darkMode ? "text-white" : "text-slate-900"
+                                )}>
+                                  {isEditing ? (
+                                    <div className="flex items-center gap-1">
+                                      <input 
+                                        type="number" 
+                                        min="0"
+                                        step="0.01"
+                                        value={fee.value}
+                                        onChange={(e) => {
+                                          const newFees = selectedBid.fees.map(f => 
+                                            f.id === fee.id ? { ...f, value: parseFloat(e.target.value) || 0 } : f
+                                          );
+                                          updateBid({ ...selectedBid, fees: newFees });
+                                        }}
+                                        className={cn(
+                                          "w-16 border-none rounded px-2 py-1 text-sm text-right",
+                                          darkMode ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-900"
+                                        )}
+                                      />
+                                      <span>{fee.type === 'Percentage' ? '%' : '$'}</span>
+                                    </div>
+                                  ) : (
+                                    fee.type === 'Percentage' ? `${fee.value}%` : formatCurrency(fee.value)
+                                  )}
+                                </div>
+                                <button 
+                                  onClick={() => {
+                                    const newFees = selectedBid.fees.filter(f => f.id !== fee.id);
+                                    updateBid({ ...selectedBid, fees: newFees });
+                                  }}
+                                  className="text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                            
+                            {/* Fee Description */}
+                            <div className="mt-1">
+                              {isEditing ? (
+                                <textarea 
+                                  placeholder="Fee description..."
+                                  value={fee.description || ''}
+                                  onChange={(e) => {
+                                    const newFees = selectedBid.fees.map(f => 
+                                      f.id === fee.id ? { ...f, description: e.target.value } : f
+                                    );
+                                    updateBid({ ...selectedBid, fees: newFees });
+                                  }}
+                                  className={cn(
+                                    "w-full border-none rounded px-2 py-1 text-[10px] min-h-[40px] resize-none",
+                                    darkMode ? "bg-slate-700 text-slate-300 placeholder-slate-500" : "bg-slate-100 text-slate-500 placeholder-slate-400"
+                                  )}
+                                />
+                              ) : (
+                                fee.description && (
+                                  <p className="text-[10px] text-slate-500 italic leading-relaxed">
+                                    {fee.description}
+                                  </p>
+                                )
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                        {selectedBid.fees.length === 0 && (
+                          <p className="text-center py-8 text-slate-400 italic text-sm">No additional fees.</p>
+                        )}
+                      </div>
+                    </section>
+
+                    {/* Comparison Chart */}
+                    <section className={cn(
+                      "rounded-2xl border shadow-sm p-6 transition-colors",
+                      darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                    )}>
+                      <h3 className={cn(
+                        "font-bold flex items-center gap-2 mb-6",
+                        darkMode ? "text-slate-100" : "text-slate-800"
+                      )}>
+                        <BarChart3 className="w-5 h-5 text-purple-500" />
+                        Cost Comparison
+                      </h3>
+                      <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={darkMode ? "#1e293b" : "#f1f5f9"} />
+                            <XAxis 
+                              dataKey="name" 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: 600 }}
+                            />
+                            <YAxis 
+                              axisLine={false} 
+                              tickLine={false} 
+                              tick={{ fill: darkMode ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: 600 }}
+                              tickFormatter={(value) => `$${value}`}
+                            />
+                            <Tooltip 
+                              cursor={{ fill: darkMode ? '#1e293b' : '#f8fafc' }}
+                              contentStyle={{ 
+                                borderRadius: '12px', 
+                                border: 'none', 
+                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff',
+                                color: darkMode ? '#f8fafc' : '#0f172a'
+                              }}
+                            />
+                            <Bar dataKey="Monthly Total" radius={[4, 4, 0, 0]}>
+                              {chartData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.name === selectedBid.haulerName ? '#2563eb' : (darkMode ? '#334155' : '#cbd5e1')} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </section>
+                  </div>
+
+                  {/* Fee Breakdown Pie Chart */}
+                  <section className={cn(
+                    "rounded-2xl border shadow-sm p-8 transition-colors",
+                    darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200"
+                  )}>
+                    <div className="flex items-center justify-between mb-8">
+                      <h3 className={cn(
+                        "text-xl font-bold flex items-center gap-2",
+                        darkMode ? "text-slate-100" : "text-slate-800"
+                      )}>
+                        <PieChartIcon className="w-6 h-6 text-emerald-500" />
+                        Fee Breakdown Analysis
+                      </h3>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+                      <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={[
+                                { name: 'Fixed Fees', value: calculateBidTotals(selectedBid).breakdown.fixedFees },
+                                { name: 'Percentage Fees', value: calculateBidTotals(selectedBid).breakdown.percentageFees },
+                                { name: 'Per Haul Fees', value: calculateBidTotals(selectedBid).breakdown.perHaulFees },
+                                { name: 'Per Ton Fees', value: calculateBidTotals(selectedBid).breakdown.perTonFees },
+                              ].filter(d => d.value > 0)}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={60}
+                              outerRadius={100}
+                              paddingAngle={5}
+                              dataKey="value"
+                            >
+                              {[
+                                '#3b82f6', // blue
+                                '#10b981', // emerald
+                                '#f59e0b', // amber
+                                '#8b5cf6', // violet
+                              ].map((color, index) => (
+                                <Cell key={`cell-${index}`} fill={color} />
+                              ))}
+                            </Pie>
+                            <Tooltip 
+                              formatter={(value: number) => formatCurrency(value)}
+                              contentStyle={{ 
+                                borderRadius: '12px', 
+                                border: 'none', 
+                                boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                                backgroundColor: darkMode ? '#0f172a' : '#ffffff',
+                                color: darkMode ? '#f8fafc' : '#0f172a'
+                              }}
+                            />
+                            <Legend verticalAlign="bottom" height={36}/>
+                          </PieChart>
+                        </ResponsiveContainer>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className={cn(
+                          "p-4 rounded-xl border",
+                          darkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50 border-slate-100"
+                        )}>
+                          <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">Fee Efficiency Score</p>
+                          {(() => {
+                            const results = calculateBidTotals(selectedBid);
+                            const feeRatio = (results.monthlyFees / results.monthlyTotal) * 100;
+                            return (
+                              <div className="flex items-end justify-between">
+                                <div>
+                                  <p className={cn(
+                                    "text-3xl font-black",
+                                    feeRatio > 30 ? "text-red-500" : feeRatio > 15 ? "text-amber-500" : "text-emerald-500"
+                                  )}>
+                                    {100 - Math.round(feeRatio)}%
+                                  </p>
+                                  <p className="text-xs text-slate-400">of total cost is base service</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm font-bold text-slate-500">{formatCurrency(results.monthlyFees)}</p>
+                                  <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest">Total Monthly Fees</p>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                        <p className="text-sm text-slate-500 leading-relaxed italic">
+                          This breakdown helps identify hidden costs. High percentage or per-haul fees can significantly impact the total contract value over time as volume increases.
+                        </p>
+                      </div>
+                    </div>
+                  </section>
+                </motion.div>
+              ) : (
+                <div className="h-full flex flex-col items-center justify-center text-center p-12 bg-white rounded-3xl border-2 border-dashed border-slate-200">
+                  <div className="bg-slate-100 p-6 rounded-full mb-6">
+                    <Calculator className="w-12 h-12 text-slate-300" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-800 mb-2">No Bids Found</h2>
+                  <p className="text-slate-500 max-w-xs mb-8">
+                    Start by adding a new waste hauling bid to analyze and compare costs.
+                  </p>
+                  <button 
+                    onClick={handleAddBid}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-blue-200"
+                  >
+                    Create First Bid
+                  </button>
+                </div>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </main>
 
-      <footer className={`py-20 border-t transition-colors ${isDark ? 'bg-[#020617] border-slate-800/50' : 'bg-white border-slate-200'}`}>
-        <div className="container mx-auto px-4 text-center">
-          <h3 className={`text-xl font-black tracking-[0.2em] uppercase italic ${isDark ? 'text-[#2dd4bf]' : 'text-teal-700'}`}>OLD SEVILLE WASTE EXPERTS</h3>
-          <p className={`text-[11px] font-black uppercase tracking-[0.7em] mt-4 ${isDark ? 'text-[#2dd4bf] opacity-40' : 'text-slate-400'}`}>EST. 2026 • PROPRIETARY AUDIT ENGINE</p>
+      {/* Footer */}
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-slate-200">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-2 opacity-50">
+            <Truck className="w-5 h-5" />
+            <span className="text-sm font-bold uppercase tracking-widest">Bidout Master v1.0</span>
+          </div>
+          <div className="flex items-center gap-8">
+            <a href="#" className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors">Documentation</a>
+            <a href="#" className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors">Privacy Policy</a>
+            <a href="#" className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase tracking-widest transition-colors">Support</a>
+          </div>
         </div>
       </footer>
-
-      <ConfirmDialog 
-        isOpen={!!confirmDialog?.isOpen}
-        message={confirmDialog?.message || ''}
-        onConfirm={() => confirmDialog?.onConfirm()}
-        onCancel={() => setConfirmDialog(null)}
-      />
     </div>
   );
-};
-
-export default App;
+}

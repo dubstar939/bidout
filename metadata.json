@@ -1,5 +1,5 @@
 {
-  "name": "Bidout: Waste Hauler Bid Calculator ",
-  "description": "A professional bidding tracker and savings calculator for commercial waste management, featuring automated cost analysis and best-value detection.",
+  "name": "Bidout Waste Hauling Bids",
+  "description": "A professional waste hauling bid analysis and comparison tool. Manage MSW, REC, and OCC waste streams, calculate hauler rates, and model competitive bids with comprehensive fee tracking.",
   "requestFramePermissions": []
 }

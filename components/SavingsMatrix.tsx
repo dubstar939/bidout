@@ -89,11 +89,11 @@ const SavingsMatrix: React.FC<SavingsMatrixProps> = ({ bids }) => {
       </div>
       <div className={`p-8 border-t flex items-start gap-6 transition-colors ${isDark ? 'bg-slate-950/60 border-teal-500/10' : 'bg-slate-50 border-slate-200'}`}>
         <div className={`w-1 self-stretch rounded-full transition-colors ${isDark ? 'bg-[#2dd4bf] shadow-[0_0_8px_#2dd4bf]' : 'bg-teal-700'}`}></div>
-        <p className={`text-[10px] italic leading-loose uppercase tracking-[0.2em] font-bold max-w-4xl ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
+        <div className={`text-[10px] italic leading-loose uppercase tracking-[0.2em] font-bold max-w-4xl ${isDark ? 'text-slate-500' : 'text-slate-500'}`}>
           <Tooltip content="The logic used to compare bids fairly by isolating fixed costs from variable event-based fees.">
             <strong className={isDark ? 'text-teal-500/80' : 'text-teal-700'}>Normalization Strategy:</strong>
           </Tooltip> Variance focus isolated to fixed Recurring OpEx and Up-front setups. Contingent event-load (Removal/Overage/XPU) is monitored but excluded from the recovery baseline to ensure fixed metric integrity.
-        </p>
+        </div>
       </div>
     </div>
   );

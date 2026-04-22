@@ -72,7 +72,7 @@ const App: React.FC = () => {
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
-  const [aiAnalysisType, setAiAnalysisType] = useState<'full' | 'slim'>('full');
+  const [aiAnalysisType, setAiAnalysisType] = useState<'full' | 'slim' | 'risk' | 'cost'>('full');
   const [confirmDialog, setConfirmDialog] = useState<{isOpen: boolean, message: string, onConfirm: () => void} | null>(null);
   
   const [bidFilter, setBidFilter] = useState<string>('all');

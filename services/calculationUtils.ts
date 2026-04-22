@@ -76,7 +76,8 @@ export const validateBid = (bid: Partial<Bid>): string[] => {
   if (!bid.services || bid.services.length === 0) errors.push("At least one service line is required.");
   if (bid.services?.some(s => !s.wasteType.trim())) errors.push("All service lines must have a waste type.");
   if (bid.services?.some(s => s.rate < 0)) errors.push("Service rates cannot be negative.");
-  if ((bid.contractTermMonths || 0) < 1) errors.push("Contract term must be at least 1 month.");
+  const term = bid.contractTermMonths || 0;
+  if (term < 1 || !Number.isInteger(term)) errors.push("Contract term must be a positive integer (minimum 1 month).");
   return errors;
 };
 

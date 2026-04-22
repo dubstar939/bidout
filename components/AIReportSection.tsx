@@ -7,8 +7,8 @@ import ReactMarkdown from 'react-markdown';
 interface AIReportSectionProps {
   aiAnalysis: string;
   isAnalyzing: boolean;
-  aiAnalysisType: 'full' | 'slim';
-  setAiAnalysisType: (type: 'full' | 'slim') => void;
+  aiAnalysisType: 'full' | 'slim' | 'risk' | 'cost';
+  setAiAnalysisType: (type: 'full' | 'slim' | 'risk' | 'cost') => void;
   onRunAnalysis: () => void;
 }
 
@@ -32,30 +32,28 @@ const AIReportSection: React.FC<AIReportSectionProps> = ({
         <div className="flex items-center gap-4 no-print" data-html2canvas-ignore="true">
             <span className={`text-[9px] font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-600'}`}>Analysis Type:</span>
             <div className={`inline-flex rounded-md shadow-sm ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`} role="group">
-                <button
+                {[
+                  { id: 'slim', label: 'Summary' },
+                  { id: 'full', label: 'Strategic' },
+                  { id: 'risk', label: 'Risk' },
+                  { id: 'cost', label: 'Cost' }
+                ].map((mode, idx, arr) => (
+                  <button
+                    key={mode.id}
                     type="button"
-                    onClick={() => setAiAnalysisType('slim')}
-                    className={`px-3 py-1 text-xs font-medium rounded-l-md transition-all ${
-                        aiAnalysisType === 'slim' 
-                            ? (isDark ? 'bg-teal-500 text-slate-900' : 'bg-teal-600 text-white') 
+                    onClick={() => setAiAnalysisType(mode.id as any)}
+                    className={`px-3 py-1 text-[9px] font-black uppercase tracking-tighter transition-all ${
+                        idx === 0 ? 'rounded-l-md' : idx === arr.length - 1 ? 'rounded-r-md' : ''
+                    } ${
+                        aiAnalysisType === mode.id 
+                            ? (isDark ? 'bg-teal-500 text-slate-950' : 'bg-teal-600 text-white') 
                             : (isDark ? 'bg-slate-700 text-slate-400 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300')
                     }`}
-                    aria-pressed={aiAnalysisType === 'slim'}
-                >
-                    Slim
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setAiAnalysisType('full')}
-                    className={`px-3 py-1 text-xs font-medium rounded-r-md transition-all ${
-                        aiAnalysisType === 'full' 
-                            ? (isDark ? 'bg-teal-500 text-slate-900' : 'bg-teal-600 text-white') 
-                            : (isDark ? 'bg-slate-700 text-slate-400 hover:bg-slate-600' : 'bg-slate-200 text-slate-700 hover:bg-slate-300')
-                    }`}
-                    aria-pressed={aiAnalysisType === 'full'}
-                >
-                    Full
-                </button>
+                    aria-pressed={aiAnalysisType === mode.id}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
             </div>
         </div>
         <p className={`text-[10px] font-bold uppercase tracking-[0.3em] px-3 py-1 border rounded-full ${isDark ? 'text-teal-500/40 bg-teal-500/5 border-teal-500/10' : 'text-teal-600 bg-teal-50 border-teal-100'}`}>Normalization Accuracy: Optimal</p>

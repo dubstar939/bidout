@@ -78,11 +78,37 @@ const App: React.FC = () => {
   const [bidFilter, setBidFilter] = useState<string>('all');
   const [bidSort, setBidSort] = useState<'asc' | 'desc'>('asc');
   const [isComparisonView, setIsComparisonView] = useState(false);
+  const [isSensitivityActive, setIsSensitivityActive] = useState(false);
 
   const reportRef = useRef<HTMLDivElement>(null);
 
   const calculatedBids = useMemo(() => calculateBidMetrics(bids), [bids]);
   const currentService = useMemo(() => calculatedBids.find(b => b.isCurrent), [calculatedBids]);
+
+  const sensitivityData = useMemo(() => {
+    return calculatedBids.map(bid => {
+      const servicesMonthly = (bid.services || []).reduce((acc, s) => acc + (s.rate || 0), 0);
+      const oneTimeFees = (bid.deliveryFee || 0) + (bid.removalFee || 0);
+      const miscRecurring = (bid.miscFees || 0) + (bid.equipmentFee || 0);
+      
+      const cpi5 = (servicesMonthly * ((bid.cpi || 0) + 5)) / 100;
+      const fuel5 = (servicesMonthly * ((bid.fuel || 0) + 5)) / 100;
+      const totalMonthly5 = servicesMonthly + cpi5 + fuel5 + miscRecurring;
+      const contractPlus5 = (totalMonthly5 * (bid.contractTermMonths || 36)) + oneTimeFees;
+
+      const cpi10 = (servicesMonthly * ((bid.cpi || 0) + 10)) / 100;
+      const fuel10 = (servicesMonthly * ((bid.fuel || 0) + 10)) / 100;
+      const totalMonthly10 = servicesMonthly + cpi10 + fuel10 + miscRecurring;
+      const contractPlus10 = (totalMonthly10 * (bid.contractTermMonths || 36)) + oneTimeFees;
+
+      return {
+        ...bid,
+        baselineContract: bid.totalContract,
+        contractPlus5,
+        contractPlus10
+      };
+    });
+  }, [calculatedBids]);
   
   const prospectiveBids = useMemo(() => {
     let filtered = calculatedBids.filter(b => !b.isCurrent);
@@ -280,13 +306,28 @@ const App: React.FC = () => {
                 </section>
 
                 <section className={`p-8 rounded border shadow-2xl backdrop-blur-md transition-colors ${isDark ? 'bg-[#1e293b]/40 border-teal-500/10' : 'bg-white border-slate-200'}`}>
-                  <h2 className="text-xs font-black text-slate-500 mb-10 uppercase tracking-[0.4em] flex items-center gap-3">
-                    <span className={`w-8 h-[1px] ${isDark ? 'bg-teal-500/50' : 'bg-slate-300'}`}></span>
-                    Strategic Analysis: Total Lifecycle Commitment
-                  </h2>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-10 pb-4 border-b border-slate-500/10">
+                    <h2 className="text-xs font-black text-slate-500 uppercase tracking-[0.4em] flex items-center gap-3">
+                      <span className={`w-8 h-[1px] ${isDark ? 'bg-teal-500/50' : 'bg-slate-300'}`}></span>
+                      Strategic Analysis: Lifecycle Commitment
+                    </h2>
+                    <div className="flex items-center gap-3 no-print">
+                      <span className={`text-[8px] font-black uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>Sensitivity View (+5%/+10%):</span>
+                      <button 
+                        onClick={() => setIsSensitivityActive(!isSensitivityActive)}
+                        className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded transition-all border ${
+                          isSensitivityActive 
+                            ? (isDark ? 'bg-teal-500/20 text-teal-400 border-teal-500/30' : 'bg-teal-50 text-teal-700 border-teal-200')
+                            : (isDark ? 'bg-slate-900/40 border-slate-700 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400 hover:text-slate-600')
+                        }`}
+                      >
+                        {isSensitivityActive ? 'ON' : 'OFF'}
+                      </button>
+                    </div>
+                  </div>
                   <div className="h-72 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={calculatedBids} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                      <BarChart data={isSensitivityActive ? sensitivityData : calculatedBids} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? "#1e293b" : "#f1f5f9"} />
                         <XAxis dataKey="haulerName" axisLine={false} tickLine={false} tick={{fill: isDark ? '#94a3b8' : '#64748b', fontSize: 10, fontWeight: '800'}} />
                         <YAxis axisLine={false} tickLine={false} tick={{fill: isDark ? '#94a3b8' : '#64748b', fontSize: 10}} tickFormatter={(val) => `$${val >= 1000 ? (val/1000).toFixed(0) + 'k' : val}`} />
@@ -297,12 +338,23 @@ const App: React.FC = () => {
                           formatter={(value: number) => [currencyFormat.format(value), '']} 
                         />
                         <Legend verticalAlign="top" align="right" iconType="rect" wrapperStyle={{paddingBottom: '30px', fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.15em', color: isDark ? '#94a3b8' : '#64748b'}} />
-                        <Bar dataKey="termRecurringTotal" name="Cumulative OpEx" stackId="a" fill={isDark ? "#1e293b" : "#e2e8f0"} stroke={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={1} />
-                        <Bar dataKey="oneTimeFees" name="Fixed Entry" stackId="a" fill={isDark ? "#2dd4bf" : "#2dd4bf"} radius={[2, 2, 0, 0]} />
+                        {isSensitivityActive ? (
+                          <>
+                            <Bar dataKey="baselineContract" name="Baseline Contract" fill={isDark ? "#0d9488" : "#0f766e"} radius={[2, 2, 0, 0]} />
+                            <Bar dataKey="contractPlus5" name="+5% CPI & Fuel" fill={isDark ? "#f59e0b" : "#d97706"} radius={[2, 2, 0, 0]} />
+                            <Bar dataKey="contractPlus10" name="+10% CPI & Fuel" fill={isDark ? "#f43f5e" : "#e11d48"} radius={[2, 2, 0, 0]} />
+                          </>
+                        ) : (
+                          <>
+                            <Bar dataKey="termRecurringTotal" name="Cumulative OpEx" stackId="a" fill={isDark ? "#1e293b" : "#e2e8f0"} stroke={isDark ? "#2dd4bf" : "#0d9488"} strokeWidth={1} />
+                            <Bar dataKey="oneTimeFees" name="Fixed Entry" stackId="a" fill={isDark ? "#2dd4bf" : "#2dd4bf"} radius={[2, 2, 0, 0]} />
+                          </>
+                        )}
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </section>
+
               </div>
             )}
 

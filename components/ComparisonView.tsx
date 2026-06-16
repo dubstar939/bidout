@@ -4,6 +4,7 @@ import { CalculatedBid } from '../types';
 import { useTheme } from './ThemeContext';
 import { currencyFormat } from '../services/calculationUtils';
 import { Icons } from '../constants';
+import Tooltip from './Tooltip';
 
 interface ComparisonViewProps {
   selectedBids: CalculatedBid[];
@@ -13,6 +14,71 @@ interface ComparisonViewProps {
 
 const ComparisonView: React.FC<ComparisonViewProps> = ({ selectedBids, currentService, onClose }) => {
   const { isDark } = useTheme();
+
+  const getVarianceTooltipContent = (mKey: string, mLabel: string, currentVal: number, bid: CalculatedBid) => {
+    const items: { name: string; val: number }[] = [];
+    
+    if (currentService && currentService.id !== bid.id) {
+      items.push({
+        name: `${currentService.haulerName} (Baseline)`,
+        val: (currentService as any)[mKey] || 0
+      });
+    }
+
+    selectedBids.forEach(ob => {
+      if (ob.id !== bid.id) {
+        items.push({
+          name: ob.haulerName,
+          val: (ob as any)[mKey] || 0
+        });
+      }
+    });
+
+    if (items.length === 0) {
+      return (
+        <span className="text-[9px] font-black uppercase text-teal-400">
+          Value: {mKey === 'cpi' || mKey === 'fuel' ? `${currentVal}%` : mKey === 'contractTermMonths' ? `${currentVal} mo` : currencyFormat.format(currentVal)}
+        </span>
+      );
+    }
+
+    return (
+      <div className="space-y-1.5 p-1">
+        <div className="border-b border-teal-500/20 pb-1 font-black uppercase text-[8px] tracking-widest text-[#2dd4bf]">
+          {mLabel} Variances
+        </div>
+        <div className="space-y-1 max-h-48 overflow-y-auto">
+          {items.map((item, idx) => {
+            const diff = currentVal - item.val;
+            const sign = diff > 0 ? '+' : '';
+            const percent = item.val !== 0 ? `${sign}${((diff / item.val) * 100).toFixed(1)}%` : '0.0%';
+            
+            let formattedDiff = '';
+            if (mKey === 'cpi' || mKey === 'fuel' || mKey === 'contractTermMonths') {
+              formattedDiff = `${sign}${diff.toFixed(1)}${mKey === 'contractTermMonths' ? 'mo' : '%'}`;
+            } else {
+              formattedDiff = diff === 0 ? 'No difference' : `${sign}${currencyFormat.format(diff)}`;
+            }
+
+            const isWorse = (mKey === 'totalMonthlyOpEx' || mKey === 'totalContract' || mKey === 'oneTimeFees' || mKey === 'contingentFees' || mKey === 'totalAnnualOpEx') ? diff > 0 : false;
+            const isBetter = (mKey === 'totalMonthlyOpEx' || mKey === 'totalContract' || mKey === 'oneTimeFees' || mKey === 'contingentFees' || mKey === 'totalAnnualOpEx') ? diff < 0 : false;
+
+            return (
+              <div key={idx} className="flex flex-col gap-0.5 border-b border-teal-500/10 pb-1 last:border-0 last:pb-0">
+                <span className="text-[8px] text-slate-400 font-medium">{item.name}</span>
+                <div className="flex justify-between font-mono gap-4">
+                  <span>Val: {mKey === 'cpi' || mKey === 'fuel' ? `${item.val}%` : mKey === 'contractTermMonths' ? `${item.val}mo` : currencyFormat.format(item.val)}</span>
+                  <span className={isBetter ? 'text-emerald-400 font-bold' : isWorse ? 'text-rose-400 font-bold' : 'text-slate-300'}>
+                    {formattedDiff} ({percent})
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
 
   if (selectedBids.length === 0) {
     return (
@@ -100,13 +166,15 @@ const ComparisonView: React.FC<ComparisonViewProps> = ({ selectedBids, currentSe
                 return (
                   <div key={m.label} className={`flex justify-between items-center border-b pb-2 ${isDark ? 'border-slate-800/50' : 'border-slate-100'}`}>
                     <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">{m.label}</span>
-                    <div className="flex items-center gap-2">
-                      <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'} ${isBetter ? 'text-emerald-400' : isWorse ? 'text-rose-400' : ''}`}>
-                        {m.format(val)}
-                      </span>
-                      {isBetter && <Icons.ChevronDown className="w-3 h-3 text-emerald-400" />}
-                      {isWorse && <Icons.ChevronUp className="w-3 h-3 text-rose-400" />}
-                    </div>
+                    <Tooltip content={getVarianceTooltipContent(m.key, m.label, val, bid)}>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs font-mono font-bold ${isDark ? 'text-white' : 'text-slate-900'} ${isBetter ? 'text-emerald-400' : isWorse ? 'text-rose-400' : ''}`}>
+                          {m.format(val)}
+                        </span>
+                        {isBetter && <Icons.ChevronDown className="w-3 h-3 text-emerald-400" />}
+                        {isWorse && <Icons.ChevronUp className="w-3 h-3 text-rose-400" />}
+                      </div>
+                    </Tooltip>
                   </div>
                 );
               })}

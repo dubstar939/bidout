@@ -48,6 +48,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
     compactorType: '',
     equipmentFee: 0,
     contractTermMonths: 36,
+    expirationDate: '',
     notes: '',
     status: {
       selected: false,
@@ -440,7 +441,7 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                 </div>
                 <h4 className={`text-[10px] font-black uppercase tracking-[0.3em] ${isDark ? 'text-teal-100' : 'text-teal-900'}`}>Agreement Metrics</h4>
               </div>
-              <div className="grid grid-cols-1 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                 <div>
                   <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">
                     <Tooltip content="The duration of the contract in months.">
@@ -450,6 +451,16 @@ const BidForm: React.FC<BidFormProps> = ({ onSave, onCancel, onConfirmRequest, i
                   <div className="relative">
                     <input type="number" min="1" name="contractTermMonths" value={formData.contractTermMonths === 0 ? '' : formData.contractTermMonths} onChange={handleChange} className={`w-full p-3 pr-14 border rounded text-sm font-black outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
                     <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[8px] font-black text-slate-500 uppercase">MO</span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[8px] font-black text-slate-500 uppercase mb-2 tracking-widest">
+                    <Tooltip content="The date this bid or agreement expires.">
+                      Expiration Date
+                    </Tooltip>
+                  </label>
+                  <div className="relative">
+                    <input type="date" name="expirationDate" value={formData.expirationDate || ''} onChange={handleChange} className={`w-full p-3 border rounded text-sm font-black outline-none ${isDark ? 'bg-slate-950/40 border-teal-500/20 text-white scheme-dark' : 'bg-white border-slate-200 text-slate-900 focus:border-teal-600'}`} />
                   </div>
                 </div>
               </div>

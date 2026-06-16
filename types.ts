@@ -29,6 +29,7 @@ export interface Bid {
   compactorType: string;
   equipmentFee: number;
   contractTermMonths: number;
+  expirationDate?: string; // ISO format YYYY-MM-DD
   notes?: string;
   status?: {
     selected: boolean;

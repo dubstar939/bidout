@@ -387,6 +387,7 @@ const App: React.FC = () => {
                     aiAnalysisType={aiAnalysisType}
                     setAiAnalysisType={setAiAnalysisType}
                     onRunAnalysis={runAnalysis}
+                    bids={calculatedBids}
                  />
               </section>
             )}
